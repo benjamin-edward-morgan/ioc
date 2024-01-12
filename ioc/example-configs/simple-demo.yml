@@ -1,0 +1,59 @@
+inputs: 
+  led: 
+    WsFloat:
+      start: 0
+      min: 0
+      max: 1
+      step: 0.01
+
+  bool:
+    WsBool:
+      start: false
+
+  str:
+    WsString:
+      start: ""
+      max_length: 1024
+
+  raspi-button: 
+    RpiDigitalBool:
+      pin: 17
+      pull_up: true 
+  
+outputs:
+  button:
+    WsBool:
+
+  bool-o: 
+    WsBool:
+
+  str-o:
+    WsString:
+
+  raspi-led:
+    RpiPwmFloat:
+      pin: 23
+      hertz: 120.0
+
+channels: {}
+
+controllers:
+  led:
+    DirectFloat:
+      input: led
+      output: raspi-led
+
+  button:
+    DirectBool:
+      input: raspi-button
+      output: button
+
+  bl:
+    DirectBool:
+      input: bool
+      output: bool-o
+
+  st:
+    DirectString:
+      input: str
+      output: str-o

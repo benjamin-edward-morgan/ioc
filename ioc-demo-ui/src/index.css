@@ -1,0 +1,97 @@
+
+
+body {
+  font-family: sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  background-color: #f9f9f9;
+  color: #202020;
+}
+
+#root{
+  min-height:100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  margin: 0;
+}
+
+h3 {
+  margin-block-end: 0.2em;
+}
+
+header {
+  background-color: #202020;
+  color: #f9f9f9;
+  padding: 1em;
+}
+
+div.content {
+  flex: 1;
+  padding: 1em;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+div.sm-col {
+  flex: 0 0 100%;
+}
+
+@media only screen and (min-width: 768px) {
+  div.sm-col {
+    flex: 0 0 32%;
+  }
+}
+
+div.lg-col {
+  flex: 0 0 100%;
+}
+
+footer {
+  background-color: #202020;
+  color: #f9f9f9;
+  padding: 1em;
+}
+
+svg.chart {
+  height: 10em;
+  width: 100%;
+}
+
+@media only screen and (min-width: 768px) {
+  svg.chart {
+    height: 20em;
+    width: 100%
+  }
+}
+
+td.tableKey {
+  font-weight: bold;
+}
+
+td.tableValue {
+  padding-left: 1em;
+}
+
+.right {
+  position: absolute;
+  right: 0;
+}
+
+span.icon {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  overflow: hidden;
+}
+
+span.icon > img {
+  position: relative;
+  max-width: 100%;
+  filter: invert(100%) sepia(40%) saturate(1%) hue-rotate(314deg) brightness(109%) contrast(95%);
+}

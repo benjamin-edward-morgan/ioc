@@ -1,0 +1,96 @@
+inputs: 
+  a: 
+    WsFloat:
+      start: 1
+      min: 0.1
+      max: 10
+      step: 0.1
+
+  b: 
+    WsFloat:
+      start: 1
+      min: 0
+      max: 10
+      step: 0.1
+  
+  c:
+    WsFloat:
+      start: 0
+      min: 0
+      max: 10
+      step: 0.1
+
+  p: 
+    WsFloat:
+      start: 1
+      min: 0
+      max: 10
+      step: 0.1
+
+  i: 
+    WsFloat:
+      start: 0
+      min: 0
+      max: 1
+      step: 0.01
+  
+  d:
+    WsFloat:
+      start: 1
+      min: 0
+      max: 10
+      step: 0.1
+
+  set_point:
+    WsFloat:
+      start: 0
+      min: -1
+      max: 1
+      step: 0.01
+
+outputs:
+  process_var:
+    WsFloat:
+
+  output:
+    WsFloat:
+
+channels:
+  proc_var:
+    Float:
+      start: 0.0 
+
+  out:
+    Float:
+      start: 0.0
+
+controllers:
+  bouncy: 
+    SimSecondOrder:
+      a: a
+      b: b
+      c: c
+      f: out
+      x: proc_var
+      x0: 0.0
+      dx0: 0.0
+      period_ms: 100
+
+  pid:
+    PID:
+      p: p
+      i: i
+      d: d
+      set_point: set_point
+      proc_var: proc_var
+      output: out
+
+  reading:
+    DirectFloat:
+      input: proc_var
+      output: process_var
+
+  fout:
+    DirectFloat:
+      input: out 
+      output: output
