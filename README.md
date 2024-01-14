@@ -9,6 +9,7 @@ You can build and run the demo in [Docker](https://www.docker.com) without insta
 ```shell
 docker compose up -d
 ```
+And visit `localhost:8080` in a browser to view the demo ui. 
 Clean it up with
 ```shell
 docker compose down

@@ -11,3 +11,6 @@ Session.vim
 .favorites.json
 .settings/
 .vs/
+
+ioc-demo-ui/node_modules
+ioc-demo-ui/dist
