@@ -15,7 +15,7 @@ inputs:
   
   c:
     WsFloat:
-      start: 0
+      start: 1
       min: 0
       max: 10
       step: 0.1
@@ -29,14 +29,14 @@ inputs:
 
   i: 
     WsFloat:
-      start: 0
+      start: 0.1
       min: 0
       max: 1
       step: 0.01
   
   d:
     WsFloat:
-      start: 1
+      start: 0.0
       min: 0
       max: 10
       step: 0.1

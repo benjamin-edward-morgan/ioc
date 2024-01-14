@@ -11,9 +11,6 @@ import Chart from './components/Chart';
 function App() {
 
   const websocketUrl = "ws://" + window.location.host + "/ws";
-  // const websocketUrl = "ws://turdatron.local:8080/ws";
-  // const websocketUrl = "ws://localhost:8080/ws";
-
 
   const [ioc, setter] = useIocWebsocketClient(websocketUrl);
 
@@ -22,8 +19,10 @@ function App() {
       <h1>IOC</h1>
     </header>
     <div className="content">
-
-
+      
+      <div className="lg-col">
+        <Chart ioc={ioc} />
+      </div>
 
       <div className="sm-col" >
         <InputTable ioc={ioc} setter={setter} />
@@ -35,10 +34,6 @@ function App() {
         <ConnectionTable ioc={ioc} />
       </div>
 
-
-      <div className="lg-col">
-        <Chart ioc={ioc} />
-      </div>
     </div>
     <footer>
       made with 😈 on planet earth

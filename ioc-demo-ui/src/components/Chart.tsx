@@ -4,6 +4,10 @@ import { useMeasure } from '@uidotdev/usehooks';
 import * as d3 from 'd3';
 
 
+/*
+This live chart is kinda jankey.
+*/
+
 interface ChartFloatValueState {
     color: string,
     points: {t: number, y: number}[];
@@ -12,9 +16,11 @@ interface ChartFloatValueState {
 type ChartValueState = { Float: ChartFloatValueState };
 
 interface ChartState {
-    timeOffset: number | null,
+    timeOffset: number | null;
     inputs: { [key: string]: ChartValueState};
     outputs: { [key: string]: ChartValueState};
+    min: number;
+    max: number;
 }
 
 function pad(n: number) {
@@ -41,6 +47,9 @@ function chartStateReducer(chartState: ChartState, action: IocState): ChartState
     const history = 10; //seconds
 
     let newChartState: ChartState = JSON.parse(JSON.stringify(chartState));
+
+    let newMin = Infinity;
+    let newMax = -Infinity;
 
     if(action.time) {
         let serverTime = action.time.seconds;
@@ -78,6 +87,8 @@ function chartStateReducer(chartState: ChartState, action: IocState): ChartState
                         }
                     };
                 }
+                newMin = Math.min(newMin, Math.min.apply(null, chartValState.Float.points.map(p => {return p.y})));
+                newMax = Math.max(newMax, Math.max.apply(null, chartValState.Float.points.map(p => {return p.y})));
             } else {
                 console.error("bad!");
             }
@@ -111,13 +122,18 @@ function chartStateReducer(chartState: ChartState, action: IocState): ChartState
                         }
                     }
                 }
-
+                newMin = Math.min(newMin, Math.min.apply(null, chartValState.Float.points.map(p => {return p.y})));
+                newMax = Math.max(newMax, Math.max.apply(null, chartValState.Float.points.map(p => {return p.y})));
             }
 
             newChartState.outputs[k] = chartValState;
         }
     }
 
+    if(isFinite(newMin) && isFinite(newMax)) {
+        newChartState.min = newMin;
+        newChartState.max = newMax;
+    }
 
     return newChartState;
 }
@@ -142,10 +158,21 @@ function ChartLine(props: {t0: number, values: ChartFloatValueState, lineBuilder
     </>
 }
 
+function ChartLegend(props: {color: string, name: string}) {
+    return <>
+        <div className="legendElement">
+            <span className="legendChip" style={{backgroundColor: props.color}} >
+            </span>
+            &nbsp;
+            <b>{props.name}</b>    
+        </div>    
+    </>
+}
+
 export default function Chart(props: {ioc: IocState}) {
 
     const ioc = props.ioc;
-    const [chartState, updateChartState] = useReducer(chartStateReducer, {timeOffset: null, inputs: {}, outputs: {}});
+    const [chartState, updateChartState] = useReducer(chartStateReducer, {timeOffset: null, inputs: {}, outputs: {}, min: 0, max: 0});
 
     const [tStart, setTStart] = useState(new Date().getTime() / 1000);
     const [tOffs, setTOffs] = useState(0);
@@ -179,8 +206,11 @@ export default function Chart(props: {ioc: IocState}) {
     
     //data domain 
     const secondsHistory = 10;
-    const valueMin = -1-1/3;
-    const valueMax = 1+1/3;
+
+    const valueRange = chartState.max - chartState.min;
+    const rangeCenter = (chartState.min + chartState.max) / 2;
+    const valueMin = valueRange < 0.2 ? rangeCenter-0.1 : rangeCenter - valueRange * 0.55;
+    const valueMax = valueRange < 0.2 ? rangeCenter+0.1 : rangeCenter + valueRange * 0.55;
 
     //scales from data domain to pixels
     const tScale = d3.scaleLinear().domain([0, secondsHistory]).range([0, final_width-margin.left-margin.right]);
@@ -189,12 +219,14 @@ export default function Chart(props: {ioc: IocState}) {
     const t0 = (ioc.time?.seconds ? ioc.time.seconds : 0.0) + tOffs;
     const lineBuilder = d3.line().x( d => tScale(d[0]) ).y( d => yScale(d[1]) );
     let paths = [];
+    let legends = [];
     
     for(const k in chartState.inputs) {
         let valueState = chartState.inputs[k];
         if('Float' in valueState) {
             let floatValueState = valueState.Float;
             paths.push(<ChartLine t0={t0} key={"fin-"+k} values={floatValueState} lineBuilder={lineBuilder} />);
+            legends.push(<ChartLegend key={"fin-"+k} name={k} color={valueState.Float.color} />);
         }
     }
 
@@ -202,7 +234,8 @@ export default function Chart(props: {ioc: IocState}) {
         let valueState = chartState.outputs[k];
         if('Float' in valueState) {
             let floatValueState = valueState.Float;
-            paths.push(<ChartLine t0={t0} key={"fout-"+k} values={floatValueState} lineBuilder={lineBuilder} />)
+            paths.push(<ChartLine t0={t0} key={"fout-"+k} values={floatValueState} lineBuilder={lineBuilder} />);
+            legends.push(<ChartLegend key={"fout-"+k} name={k} color={valueState.Float.color} />);
         }
     }
 
@@ -222,16 +255,10 @@ export default function Chart(props: {ioc: IocState}) {
                     <YAxis scale={yScale} pixelsPerTick={25} />
                     {paths}
                 </g>
-                
-
-
-
             </g>
         </svg>
-        <div>
-            <pre>
-                {/* {JSON.stringify(chartState, null, 2)} */}
-            </pre>
+        <div className="legendArea">
+            {legends}
         </div>
     </>
 }
