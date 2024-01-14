@@ -1,4 +1,5 @@
 use ioc::config::IocConfig;
+use tracing::{warn, error};
 use std::env; 
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -16,18 +17,19 @@ async fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() > 2 {
-        println!("only one parameter, the config file, is expected. If omitted defaults to ioc.yml");
-        println!("got {}", args.join(","));
+    if args.len() != 2 {
+        warn!("only one parameter, the config file, is expected.");
+        warn!("got {}", args.join(","));
     } else {
-        let cfg_name: &str = args.get(1).map(|o| o.as_str()).unwrap_or("ioc");
-        match IocConfig::new(cfg_name) {
-            Ok(cfg) => {
-               let ioc = cfg.start();
-               ioc.await;
-            },
-            Err(err) => {
-                println!("config error! {}", err);
+        if let Some(cfg_name) = args.get(1).map(|o| o.as_str()) {
+            match IocConfig::new(cfg_name) {
+                Ok(cfg) => {
+                   let ioc = cfg.start();
+                   ioc.await;
+                },
+                Err(err) => {
+                    error!("config error! {}", err);
+                }
             }
         }
     }

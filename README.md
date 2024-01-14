@@ -9,11 +9,16 @@ You can build and run the demo in [Docker](https://www.docker.com) without insta
 ```shell
 docker compose up -d
 ```
-And visit `localhost:8080` in a browser to view the demo ui. 
+And visit `localhost:8080` in a browser to view the demo ui. (has problems in Safari at the moment)
+
+The demo is a [damped harmonic oscilator](https://en.wikipedia.org/wiki/Harmonic_oscillator) simulation, being driven by a [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller). You can change the oscilator parameters (a, b, and c), the PID parameters (p, i, and d), and the set_point. The outputs are the position and the force applied by the controller.
+
 Clean it up with
 ```shell
 docker compose down
 ```
+
+See [other dev notes](NOTES.md)
 
 #### Subprojects
 

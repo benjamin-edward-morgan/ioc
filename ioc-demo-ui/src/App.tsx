@@ -19,7 +19,7 @@ function App() {
       <h1>IOC</h1>
     </header>
     <div className="content">
-      
+
       <div className="lg-col">
         <Chart ioc={ioc} />
       </div>

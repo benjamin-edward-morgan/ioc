@@ -62,7 +62,7 @@ function chartStateReducer(chartState: ChartState, action: IocState): ChartState
         for(const k in action.inputs) if(k.length > 1) {
             let input = action.inputs[k];
             let chartValState: ChartValueState | undefined = newChartState.inputs[k];
-            if('Float' in input) {
+            if(input && 'Float' in input) {
                 let floatInput = input.Float;
                 if(chartValState) {
                     if('Float' in chartValState) {
@@ -98,7 +98,7 @@ function chartStateReducer(chartState: ChartState, action: IocState): ChartState
         for(const k in action.outputs) {
             let output = action.outputs[k];
             let chartValState: ChartValueState | undefined = newChartState.outputs[k];
-            if('Float' in output) {
+            if(output && 'Float' in output) {
                 let floatOutput = output.Float;
                 if(chartValState) {
                     if('Float' in chartValState) {
@@ -223,7 +223,7 @@ export default function Chart(props: {ioc: IocState}) {
     
     for(const k in chartState.inputs) {
         let valueState = chartState.inputs[k];
-        if('Float' in valueState) {
+        if(valueState && 'Float' in valueState) {
             let floatValueState = valueState.Float;
             paths.push(<ChartLine t0={t0} key={"fin-"+k} values={floatValueState} lineBuilder={lineBuilder} />);
             legends.push(<ChartLegend key={"fin-"+k} name={k} color={valueState.Float.color} />);
@@ -232,7 +232,7 @@ export default function Chart(props: {ioc: IocState}) {
 
     for(const k in chartState.outputs) {
         let valueState = chartState.outputs[k];
-        if('Float' in valueState) {
+        if(valueState && 'Float' in valueState) {
             let floatValueState = valueState.Float;
             paths.push(<ChartLine t0={t0} key={"fout-"+k} values={floatValueState} lineBuilder={lineBuilder} />);
             legends.push(<ChartLegend key={"fout-"+k} name={k} color={valueState.Float.color} />);

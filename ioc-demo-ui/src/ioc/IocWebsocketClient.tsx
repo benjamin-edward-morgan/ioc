@@ -36,7 +36,6 @@ export type IocOutput = {Float: IocFloatOutput } | { Bool: IocBoolOutput } | { S
 export interface IocState {
     connected: boolean;
     status: string;
-    // lastMessage: string;
     upSince: Date | null,
     time: { seconds: number } | null;
     inputs: { [key: string]: IocInput };
@@ -159,15 +158,12 @@ export default function useIocWebsocketClient(url: string): [IocState, SetterFn]
             if("Float" in input && typeof v === "number") {
                 update[k] = { Float: { value: v } };
                 sendMessage(JSON.stringify(update));
-                // setSent(sent + 1);
             } else if("Bool" in input && typeof v === "boolean") {
                 update[k] = { Bool: { value: v } };
                 sendMessage(JSON.stringify(update));
-                // setSent(sent + 1);
             } else if("String" in input && typeof v === "string") {
                 update[k] = { String: { value: v } };
                 sendMessage(JSON.stringify(update));
-                // setSent(sent + 1);
             } else {
                 console.warn("can't set input " + k + " to type " + (typeof v));
             }
@@ -178,18 +174,16 @@ export default function useIocWebsocketClient(url: string): [IocState, SetterFn]
 
     useEffect(() => {
         if(lastMessage && lastMessage.data) {
-            // countMessage(lastMessage);
             let data: WsMessage = JSON.parse(lastMessage?.data);
             if(data) {
                 setState(data)
             }
         }
-    }, [lastMessage, setState /*, countMessage*/]);
+    }, [lastMessage, setState]);
 
     let iocState = {
         connected: connected,
         status: status,
-        // lastMessage: lastMessage?.data,
         upSince: upSince,
         time: state.time,
         inputs: state.inputs,
