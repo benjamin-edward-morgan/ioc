@@ -3,12 +3,10 @@ run-name: Testing a PR by ${{github.actor}}
 on: [pull_request]
 jobs:
   test:
+    name: check cargo fmt, clippy, build
     runs-on: ubuntu-latest
-    run: ls -lha 
-    container: 
-      image: rust:alpine3.19
-      volumes:
-        - .:/src/ioc
     steps:
-      - name: testing
-        run: ls -lha && pwd
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+      - name: Rustfmt
+        run: cargo fmt --all -- --check
