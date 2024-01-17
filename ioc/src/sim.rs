@@ -1,7 +1,10 @@
+use crate::InputSource;
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use tokio::task::JoinHandle;
 use tracing::warn;
-use crate::InputSource;
-use std::{time::Instant, sync::{Arc, Mutex}};
 
 pub mod second_order_ode;
 
@@ -16,11 +19,11 @@ struct ValueAverageData {
 impl ValueAverageData {
     pub fn new(start: f64) -> Self {
         let now = Instant::now();
-        ValueAverageData{
+        ValueAverageData {
             last_value: start,
             last_instant: now,
             sum: 0.0,
-            start_instant: now
+            start_instant: now,
         }
     }
 
@@ -29,7 +32,7 @@ impl ValueAverageData {
 
         //append a reimann sum to sum, set last_value and last_instant
         let since_last_sec = now.duration_since(self.last_instant).as_secs_f64();
-        self.sum = self.sum + (since_last_sec * self.last_value);
+        self.sum += since_last_sec * self.last_value;
         self.last_value = new_value;
         self.last_instant = now;
     }
@@ -52,7 +55,7 @@ impl ValueAverageData {
         self.sum = 0.0;
         self.start_instant = now;
 
-        //return average since last reading 
+        //return average since last reading
         average
     }
 }
@@ -62,10 +65,8 @@ pub struct ValueAverage {
     pub handle: JoinHandle<()>,
 }
 
-
 impl ValueAverage {
     pub fn new(source: InputSource<f64>) -> Self {
-
         let data = Arc::new(Mutex::new(ValueAverageData::new(source.start)));
 
         let mut rx = source.rx;
@@ -75,22 +76,23 @@ impl ValueAverage {
                 match (rx.recv().await, handle_data.lock()) {
                     (Ok(new_value), Ok(mut data)) => {
                         data.append(new_value);
-                    },
+                    }
                     (val_res, mtx_res) => {
-                        warn!("value avg error!\nreceived:{:?}\ndata_locl:{:?}", val_res, mtx_res);
+                        warn!(
+                            "value avg error!\nreceived:{:?}\ndata_locl:{:?}",
+                            val_res, mtx_res
+                        );
                     }
                 }
             }
         });
 
-        ValueAverage { data: data, handle: handle }
+        ValueAverage { data, handle }
     }
 
     pub fn read(&mut self) -> f64 {
         match self.data.lock() {
-            Ok(mut data) => {
-                data.read()
-            },
+            Ok(mut data) => data.read(),
             mtx_res => {
                 warn!("value avg read error! {:?}", mtx_res);
                 0.0

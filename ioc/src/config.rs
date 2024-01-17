@@ -1,58 +1,41 @@
-
 use std::{collections::HashMap, fmt::Display};
 
+use config::{Config, ConfigError, File, Map};
 use serde::Deserialize;
-use config::{Map, ConfigError, Config, File};
 use tokio::task::JoinHandle;
 use tracing::warn;
 
 use crate::{
-    input::{constant::ConstantInputConfig, noise::NoiseInputConfig}, 
-    Input, 
-    output::ConsoleOutputConfig, 
-    Output, 
-    controller::{DirectControllerConfig, pid::PidControllerConfig}, 
-    sim::second_order_ode::SecondOrderOdeConfig, 
-    channel::{ChannelConfig, Channel}, InputSource, OutputSink,
+    channel::{Channel, ChannelConfig},
+    controller::{pid::PidControllerConfig, DirectControllerConfig},
+    input::{constant::ConstantInputConfig, noise::NoiseInputConfig},
+    output::ConsoleOutputConfig,
+    sim::second_order_ode::SecondOrderOdeConfig,
+    Input, InputSource, Output, OutputSink,
 };
 
 #[cfg(feature = "ws-server")]
 use crate::ws::{
-    WsInputFloatConfig, 
-    WsInputBoolConfig, 
-    WsInputStringConfig,
-    WsServerConfig, 
-    WsStateConfig, 
-    WsServer, 
-    WsStateInputConfig, 
-    WsStateOutputConfig,
-    input::WsInput,
-    output::WsOutput,
+    input::WsInput, output::WsOutput, WsInputBoolConfig, WsInputFloatConfig, WsInputStringConfig,
+    WsServer, WsServerConfig, WsStateConfig, WsStateInputConfig, WsStateOutputConfig,
 };
 
 #[cfg(feature = "rpi")]
 use crate::rpi::{
+    InputRpiConfig, OutputRpiConfig, Rpi, RpiBuilder, RpiDigitalBoolInputConfig,
     RpiPwmFloatOutputConfig,
-    OutputRpiConfig,
-    RpiDigitalBoolInputConfig,
-    InputRpiConfig,
-    RpiBuilder,
-    Rpi,
 };
-
-
 
 #[derive(Deserialize, Debug)]
 pub struct IocConfig {
-    pub inputs: Map<String,InputConfig>,
-    pub outputs: Map<String,OutputConfig>,
+    pub inputs: Map<String, InputConfig>,
+    pub outputs: Map<String, OutputConfig>,
     pub channels: Map<String, ChannelConfig>,
-    pub controllers: Map<String,ControllerConfig>,
+    pub controllers: Map<String, ControllerConfig>,
 }
 
 impl IocConfig {
     pub fn new(config: &str) -> Result<Self, ConfigError> {
-
         let cfg = Config::builder()
             .add_source(File::with_name(config))
             .build()?;
@@ -61,16 +44,16 @@ impl IocConfig {
     }
 
     pub async fn start(self) {
-        
         let mut inputs = HashMap::with_capacity(self.inputs.len());
         let mut outputs = HashMap::with_capacity(self.outputs.len());
         let mut channels = HashMap::with_capacity(self.channels.len());
 
-        let mut handles = Vec::with_capacity(self.inputs.len() + self.outputs.len() + self.controllers.len());
-        
+        let mut handles =
+            Vec::with_capacity(self.inputs.len() + self.outputs.len() + self.controllers.len());
+
         let mut input_core_features = HashMap::with_capacity(self.inputs.len());
         let mut output_core_features = HashMap::with_capacity(self.outputs.len());
-        
+
         #[cfg(feature = "ws-server")]
         let mut input_ws_srv_features = HashMap::with_capacity(self.inputs.len());
 
@@ -88,17 +71,17 @@ impl IocConfig {
             match input_feature {
                 InputConfigFeature::Core(core_cfg) => {
                     input_core_features.insert(k, core_cfg);
-                },
+                }
 
                 #[cfg(feature = "ws-server")]
                 InputConfigFeature::WsServer(ws_srv_cfg) => {
                     input_ws_srv_features.insert(k, ws_srv_cfg);
-                },
+                }
 
                 #[cfg(feature = "rpi")]
                 InputConfigFeature::Rpi(rpi_cfg) => {
                     input_rpi_features.insert(k, rpi_cfg);
-                },
+                }
             }
         }
 
@@ -107,17 +90,17 @@ impl IocConfig {
             match output_feature {
                 OutputConfigFeature::Core(core_cfg) => {
                     output_core_features.insert(k, core_cfg);
-                },
+                }
 
                 #[cfg(feature = "ws-server")]
                 OutputConfigFeature::WsServer(ws_srv_cfg) => {
                     output_ws_srv_features.insert(k, ws_srv_cfg);
-                },
+                }
 
                 #[cfg(feature = "rpi")]
                 OutputConfigFeature::Rpi(rpi_cfg) => {
                     output_rpi_features.insert(k, rpi_cfg);
-                },
+                }
             }
         }
 
@@ -128,13 +111,12 @@ impl IocConfig {
         for (k, o) in output_core_features {
             outputs.insert(k, o.boxed());
         }
-        
 
         #[cfg(feature = "ws-server")]
         {
             if input_ws_srv_features.is_empty() && output_ws_srv_features.is_empty() {
                 warn!("There are no ws inputs or outputs! Running with the ws-server feature enabled is moot.");
-            } 
+            }
 
             //todo: eliminate this conversion
             let mut wsi_cfgs = HashMap::with_capacity(input_ws_srv_features.len());
@@ -148,12 +130,12 @@ impl IocConfig {
                 });
             }
 
-            let srv_cfg = WsServerConfig{
-                state_config: WsStateConfig{
+            let srv_cfg = WsServerConfig {
+                state_config: WsStateConfig {
                     input_configs: wsi_cfgs,
                     output_configs: output_ws_srv_features,
                     channel_size: 64,
-                }
+                },
             };
 
             let server = WsServer::new(srv_cfg).await;
@@ -161,12 +143,12 @@ impl IocConfig {
 
             for (k, i) in server.inputs {
                 match i {
-                    WsInput::Float{ input } => {
+                    WsInput::Float { input } => {
                         inputs.insert(k.to_string(), InputBox::Float(Box::new(input)));
-                    },
+                    }
                     WsInput::Bool { input } => {
                         inputs.insert(k.to_string(), InputBox::Bool(Box::new(input)));
-                    },
+                    }
                     WsInput::String { input } => {
                         inputs.insert(k.to_string(), InputBox::String(Box::new(input)));
                     }
@@ -177,15 +159,15 @@ impl IocConfig {
                 match o {
                     WsOutput::Float { output } => {
                         outputs.insert(k, OutputBox::Float(Box::new(output)));
-                    },
+                    }
                     WsOutput::Bool { output } => {
                         outputs.insert(k, OutputBox::Bool(Box::new(output)));
-                    },
+                    }
                     WsOutput::String { output } => {
                         outputs.insert(k, OutputBox::String(Box::new(output)));
-                    },
+                    }
                 }
-            }  
+            }
         }
 
         #[cfg(feature = "rpi")]
@@ -209,26 +191,24 @@ impl IocConfig {
             channels.insert(k, c.into());
         }
 
-        let ports = BoxedPorts{
-            inputs: inputs,
-            outputs: outputs,
-            channels: channels,
+        let ports = BoxedPorts {
+            inputs,
+            outputs,
+            channels,
         };
 
-        self.controllers.iter().for_each(|(k, c)| {
-            match c.try_build(&ports) {
+        self.controllers
+            .iter()
+            .for_each(|(k, c)| match c.try_build(&ports) {
                 Ok(handle) => handles.push(handle),
                 Err(cbe) => panic!("Error building controller {}: {}", k, cbe),
-            }
-        });
-        
-        futures::future::join_all(handles).await;
+            });
 
+        futures::future::join_all(handles).await;
     }
 }
 
-
-// named types for all input configs 
+// named types for all input configs
 #[derive(Deserialize, Debug)]
 pub enum InputConfig {
     Constant(ConstantInputConfig),
@@ -267,7 +247,6 @@ pub enum InputWsServerConfig {
     WsString(WsInputStringConfig),
 }
 
-
 //InputConfig, but bucketed by feature
 pub enum InputConfigFeature {
     Core(InputCoreConfig),
@@ -279,21 +258,29 @@ pub enum InputConfigFeature {
     Rpi(InputRpiConfig),
 }
 
-impl Into<InputConfigFeature> for InputConfig {
-    fn into(self) -> InputConfigFeature {
-        match self {
+impl From<InputConfig> for InputConfigFeature {
+    fn from(val: InputConfig) -> Self {
+        match val {
             InputConfig::Constant(cfg) => InputConfigFeature::Core(InputCoreConfig::Constant(cfg)),
             InputConfig::Noise(cfg) => InputConfigFeature::Core(InputCoreConfig::Noise(cfg)),
 
             #[cfg(feature = "ws-server")]
-            InputConfig::WsFloat(cfg) => InputConfigFeature::WsServer(InputWsServerConfig::WsFloat(cfg)),
+            InputConfig::WsFloat(cfg) => {
+                InputConfigFeature::WsServer(InputWsServerConfig::WsFloat(cfg))
+            }
             #[cfg(feature = "ws-server")]
-            InputConfig::WsBool(cfg) => InputConfigFeature::WsServer(InputWsServerConfig::WsBool(cfg)),
+            InputConfig::WsBool(cfg) => {
+                InputConfigFeature::WsServer(InputWsServerConfig::WsBool(cfg))
+            }
             #[cfg(feature = "ws-server")]
-            InputConfig::WsString(cfg) => InputConfigFeature::WsServer(InputWsServerConfig::WsString(cfg)),
+            InputConfig::WsString(cfg) => {
+                InputConfigFeature::WsServer(InputWsServerConfig::WsString(cfg))
+            }
 
             #[cfg(feature = "rpi")]
-            InputConfig::RpiDigitalBool(cfg) => InputConfigFeature::Rpi(InputRpiConfig::RpiDigitalBoolInput(cfg))
+            InputConfig::RpiDigitalBool(cfg) => {
+                InputConfigFeature::Rpi(InputRpiConfig::RpiDigitalBoolInput(cfg))
+            }
         }
     }
 }
@@ -341,12 +328,18 @@ pub enum OutputConfigFeature {
     Rpi(OutputRpiConfig),
 }
 
-impl Into<OutputConfigFeature> for OutputConfig {
-    fn into(self) -> OutputConfigFeature {
-        match self {
-            OutputConfig::ConsoleBool(cfg) => OutputConfigFeature::Core(OutputCoreConfig::ConsoleBool(cfg)),
-            OutputConfig::ConsoleFloat(cfg) => OutputConfigFeature::Core(OutputCoreConfig::ConsoleFloat(cfg)),
-            OutputConfig::ConsoleString(cfg) => OutputConfigFeature::Core(OutputCoreConfig::ConsoleString(cfg)),
+impl From<OutputConfig> for OutputConfigFeature {
+    fn from(val: OutputConfig) -> Self {
+        match val {
+            OutputConfig::ConsoleBool(cfg) => {
+                OutputConfigFeature::Core(OutputCoreConfig::ConsoleBool(cfg))
+            }
+            OutputConfig::ConsoleFloat(cfg) => {
+                OutputConfigFeature::Core(OutputCoreConfig::ConsoleFloat(cfg))
+            }
+            OutputConfig::ConsoleString(cfg) => {
+                OutputConfigFeature::Core(OutputCoreConfig::ConsoleString(cfg))
+            }
 
             #[cfg(feature = "ws-server")]
             OutputConfig::WsFloat => OutputConfigFeature::WsServer(WsStateOutputConfig::Float),
@@ -356,19 +349,19 @@ impl Into<OutputConfigFeature> for OutputConfig {
             OutputConfig::WsString => OutputConfigFeature::WsServer(WsStateOutputConfig::String),
 
             #[cfg(feature = "rpi")]
-            OutputConfig::RpiPwmFloat(cfg) => OutputConfigFeature::Rpi(OutputRpiConfig::RpiPwmFloatOutput(cfg)),
+            OutputConfig::RpiPwmFloat(cfg) => {
+                OutputConfigFeature::Rpi(OutputRpiConfig::RpiPwmFloatOutput(cfg))
+            }
         }
     }
 }
-
-
 
 #[derive(Deserialize, Debug)]
 pub enum ControllerConfig {
     DirectFloat(DirectControllerConfig),
     DirectBool(DirectControllerConfig),
     DirectString(DirectControllerConfig),
-    
+
     //Function1()
     PID(PidControllerConfig),
     SimSecondOrder(SecondOrderOdeConfig),
@@ -386,7 +379,6 @@ impl ControllerBuilder for ControllerConfig {
     }
 }
 
-
 // internals
 
 pub enum OutputBox {
@@ -399,19 +391,28 @@ impl OutputBox {
     pub fn get_float_sink(&self) -> Result<OutputSink<f64>, ControllerBuilderError> {
         match self {
             OutputBox::Float(f) => Ok(f.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as Float", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as Float",
+                wrong_box
+            ))),
         }
     }
     pub fn get_bool_sink(&self) -> Result<OutputSink<bool>, ControllerBuilderError> {
         match self {
             OutputBox::Bool(b) => Ok(b.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as Bool", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as Bool",
+                wrong_box
+            ))),
         }
     }
     pub fn get_string_sink(&self) -> Result<OutputSink<String>, ControllerBuilderError> {
         match self {
             OutputBox::String(s) => Ok(s.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as String", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as String",
+                wrong_box
+            ))),
         }
     }
 }
@@ -437,19 +438,28 @@ impl InputBox {
     pub fn get_float_source(&self) -> Result<InputSource<f64>, ControllerBuilderError> {
         match self {
             InputBox::Float(f) => Ok(f.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use input {} as a Float", wrong_box))), 
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use input {} as a Float",
+                wrong_box
+            ))),
         }
     }
     pub fn get_bool_source(&self) -> Result<InputSource<bool>, ControllerBuilderError> {
         match self {
             InputBox::Bool(b) => Ok(b.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use input {} as a Bool", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use input {} as a Bool",
+                wrong_box
+            ))),
         }
     }
     pub fn get_string_source(&self) -> Result<InputSource<String>, ControllerBuilderError> {
         match self {
             InputBox::String(s) => Ok(s.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use input {} as a String", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use input {} as a String",
+                wrong_box
+            ))),
         }
     }
 }
@@ -459,7 +469,7 @@ impl Display for InputBox {
         let str = match self {
             InputBox::Float(_) => "Float",
             InputBox::Bool(_) => "Bool",
-            InputBox::String(_) => "String"
+            InputBox::String(_) => "String",
         };
         f.write_str(str)
     }
@@ -475,38 +485,56 @@ impl ChannelBox {
     pub fn get_float_source(&self) -> Result<InputSource<f64>, ControllerBuilderError> {
         match self {
             ChannelBox::Float(f) => Ok(f.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use {} as a Float", wrong_box))), 
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use {} as a Float",
+                wrong_box
+            ))),
         }
     }
     pub fn get_bool_source(&self) -> Result<InputSource<bool>, ControllerBuilderError> {
         match self {
             ChannelBox::Bool(b) => Ok(b.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use {} as a Bool", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use {} as a Bool",
+                wrong_box
+            ))),
         }
     }
     pub fn get_string_source(&self) -> Result<InputSource<String>, ControllerBuilderError> {
         match self {
             ChannelBox::String(s) => Ok(s.source()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use {} as a String", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use {} as a String",
+                wrong_box
+            ))),
         }
     }
 
     pub fn get_float_sink(&self) -> Result<OutputSink<f64>, ControllerBuilderError> {
         match self {
             ChannelBox::Float(f) => Ok(f.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as Float", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as Float",
+                wrong_box
+            ))),
         }
     }
     pub fn get_bool_sink(&self) -> Result<OutputSink<bool>, ControllerBuilderError> {
         match self {
             ChannelBox::Bool(b) => Ok(b.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as Bool", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as Bool",
+                wrong_box
+            ))),
         }
     }
     pub fn get_string_sink(&self) -> Result<OutputSink<String>, ControllerBuilderError> {
         match self {
             ChannelBox::String(s) => Ok(s.sink()),
-            wrong_box => Err(ControllerBuilderError::from_string(format!("cannot use output {} as String", wrong_box))),
+            wrong_box => Err(ControllerBuilderError::from_string(format!(
+                "cannot use output {} as String",
+                wrong_box
+            ))),
         }
     }
 }
@@ -525,68 +553,91 @@ impl Display for ChannelBox {
 pub struct BoxedPorts {
     inputs: HashMap<String, InputBox>,
     outputs: HashMap<String, OutputBox>,
-    channels: HashMap<String, ChannelBox>
+    channels: HashMap<String, ChannelBox>,
 }
 
 impl BoxedPorts {
     pub fn get_float_source(&self, k: &str) -> Result<InputSource<f64>, ControllerBuilderError> {
         match self.inputs.get(k) {
             Some(input_box) => input_box.get_float_source(),
-            None => {
-                match self.channels.get(k) {
-                    Some(channel) => channel.get_float_source(),
-                    None => Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))),
-                }
-            }
+            None => match self.channels.get(k) {
+                Some(channel) => channel.get_float_source(),
+                None => Err(ControllerBuilderError::from_string(format!(
+                    "Can't find an input or channel with name {}",
+                    k
+                ))),
+            },
         }
     }
     pub fn get_bool_source(&self, k: &str) -> Result<InputSource<bool>, ControllerBuilderError> {
         match self.inputs.get(k) {
             Some(input_box) => input_box.get_bool_source(),
-            None => {
-                match self.channels.get(k) {
-                    Some(channel) => channel.get_bool_source(),
-                    None => Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))),
-                }
-            }
+            None => match self.channels.get(k) {
+                Some(channel) => channel.get_bool_source(),
+                None => Err(ControllerBuilderError::from_string(format!(
+                    "Can't find an input or channel with name {}",
+                    k
+                ))),
+            },
         }
     }
-    pub fn get_string_source(&self, k: &str) -> Result<InputSource<String>, ControllerBuilderError> {
+    pub fn get_string_source(
+        &self,
+        k: &str,
+    ) -> Result<InputSource<String>, ControllerBuilderError> {
         match self.inputs.get(k) {
             Some(input_box) => input_box.get_string_source(),
-            None => {
-                match self.channels.get(k) {
-                    Some(channel) => channel.get_string_source(),
-                    None => Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))),
-                }
-            }
+            None => match self.channels.get(k) {
+                Some(channel) => channel.get_string_source(),
+                None => Err(ControllerBuilderError::from_string(format!(
+                    "Can't find an input or channel with name {}",
+                    k
+                ))),
+            },
         }
     }
 
     pub fn get_float_sink(&self, k: &str) -> Result<OutputSink<f64>, ControllerBuilderError> {
-        self.outputs.get(k).map(|o| o.get_float_sink())
+        self.outputs
+            .get(k)
+            .map(|o| o.get_float_sink())
             .or(self.channels.get(k).map(|c| c.get_float_sink()))
-            .unwrap_or(Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))))
+            .unwrap_or(Err(ControllerBuilderError::from_string(format!(
+                "Can't find an input or channel with name {}",
+                k
+            ))))
     }
     pub fn get_bool_sink(&self, k: &str) -> Result<OutputSink<bool>, ControllerBuilderError> {
-        self.outputs.get(k).map(|o| o.get_bool_sink())
+        self.outputs
+            .get(k)
+            .map(|o| o.get_bool_sink())
             .or(self.channels.get(k).map(|c| c.get_bool_sink()))
-            .unwrap_or(Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))))
+            .unwrap_or(Err(ControllerBuilderError::from_string(format!(
+                "Can't find an input or channel with name {}",
+                k
+            ))))
     }
     pub fn get_string_sink(&self, k: &str) -> Result<OutputSink<String>, ControllerBuilderError> {
-        self.outputs.get(k).map(|o| o.get_string_sink())
+        self.outputs
+            .get(k)
+            .map(|o| o.get_string_sink())
             .or(self.channels.get(k).map(|c| c.get_string_sink()))
-            .unwrap_or(Err(ControllerBuilderError::from_string(format!("Can't find an input or channel with name {}", k))))
+            .unwrap_or(Err(ControllerBuilderError::from_string(format!(
+                "Can't find an input or channel with name {}",
+                k
+            ))))
     }
 }
 
 pub struct ControllerBuilderError {
-    pub errors: Vec<String>
+    pub errors: Vec<String>,
 }
 
 impl ControllerBuilderError {
     pub fn new(s: &str) -> Self {
-        ControllerBuilderError{ errors: vec![s.to_string()] }
+        ControllerBuilderError {
+            errors: vec![s.to_string()],
+        }
     }
     pub fn from_string(s: String) -> Self {
         ControllerBuilderError { errors: vec![s] }
@@ -595,7 +646,11 @@ impl ControllerBuilderError {
         ControllerBuilderError { errors: errs }
     }
     pub fn from_errors(errs: Vec<ControllerBuilderError>) -> Self {
-        let errs: Vec<String> = errs.iter().flat_map(|err| err.errors.iter()).map(|s| s.to_string()).collect();
+        let errs: Vec<String> = errs
+            .iter()
+            .flat_map(|err| err.errors.iter())
+            .map(|s| s.to_string())
+            .collect();
         ControllerBuilderError::from_vec(errs)
     }
 }

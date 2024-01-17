@@ -1,11 +1,13 @@
-
 use std::time::Instant;
 
 use serde::Deserialize;
 use tokio::task::JoinHandle;
 use tracing::error;
 
-use crate::{InputSource,OutputSink, config::{ControllerBuilder, BoxedPorts, ControllerBuilderError}};
+use crate::{
+    config::{BoxedPorts, ControllerBuilder, ControllerBuilderError},
+    InputSource, OutputSink,
+};
 
 struct PidState {
     p: f64,
@@ -42,7 +44,7 @@ impl PidState {
     }
 }
 
-pub struct PidController{
+pub struct PidController {
     pub handle: JoinHandle<()>,
 }
 
@@ -55,9 +57,7 @@ impl PidController {
         process_var: InputSource<f64>,
         output: OutputSink<f64>,
     ) -> Self {
-
         let handle = tokio::spawn(async move {
-
             let mut pid = PidState {
                 p: p.start,
                 i: i.start,
@@ -137,9 +137,9 @@ impl PidController {
                                 error!("setpoint receive error! {:?}", err);
                             },
                         }
-                        
+
                     }
-                   
+
                     pv_res = pv_rx.recv() => {
                         match pv_res {
                             Ok(new_pv) => {
@@ -153,17 +153,15 @@ impl PidController {
                             Err(err) => {
                                 error!("pv receive err: {:?}", err);
                             }
-                        }   
+                        }
                     }
                 }
             }
         });
 
-
-        PidController { handle: handle }
+        PidController { handle }
     }
 }
-
 
 #[derive(Deserialize, Debug)]
 pub struct PidControllerConfig {
@@ -177,34 +175,30 @@ pub struct PidControllerConfig {
 
 impl ControllerBuilder for PidControllerConfig {
     fn try_build(&self, ports: &BoxedPorts) -> Result<JoinHandle<()>, ControllerBuilderError> {
-
         match (
             ports.get_float_source(&self.p),
             ports.get_float_source(&self.i),
             ports.get_float_source(&self.d),
             ports.get_float_source(&self.set_point),
             ports.get_float_source(&self.proc_var),
-            ports.get_float_sink(&self.output)
+            ports.get_float_sink(&self.output),
         ) {
             (Ok(p), Ok(i), Ok(d), Ok(sp), Ok(pv), Ok(out)) => {
-                let controller = PidController::new(
-                    p, 
-                    i, 
-                    d, 
-                    sp, 
-                    pv, 
-                    out, 
-                );
+                let controller = PidController::new(p, i, d, sp, pv, out);
 
                 Ok(controller.handle)
-            },
+            }
             (p, i, d, sp, pv, out) => {
                 let mut errs: Vec<ControllerBuilderError> = Vec::with_capacity(6);
-                for x in vec![p,i,d,sp,pv] {
-                    if let Err(e) =x { errs.push(e) }
+                for x in vec![p, i, d, sp, pv] {
+                    if let Err(e) = x {
+                        errs.push(e)
+                    }
                 }
-                if let Err(e) = out { errs.push(e) }
-                Err(ControllerBuilderError::from_errors(errs))            
+                if let Err(e) = out {
+                    errs.push(e)
+                }
+                Err(ControllerBuilderError::from_errors(errs))
             }
         }
     }

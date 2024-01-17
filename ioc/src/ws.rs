@@ -1,31 +1,31 @@
 use axum::{
     extract::{
+        ws::{WebSocket, WebSocketUpgrade},
         State,
-        ws::{WebSocketUpgrade, WebSocket}
     },
     response::IntoResponse,
     routing::get,
     Router,
 };
 use serde::Deserialize;
+use std::{collections::HashMap, net::SocketAddr};
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use tokio::sync::{mpsc,oneshot};
-use std::{net::SocketAddr, collections::HashMap};
 use tower_http::{
-    services::{ServeDir,ServeFile},
+    services::{ServeDir, ServeFile},
     trace::{DefaultMakeSpan, TraceLayer},
 };
 
 pub mod input;
-pub mod output;
 mod message;
-mod mgr; 
+mod mgr;
+pub mod output;
 mod state;
 
 use mgr::WsManager;
 use state::WsState;
 
-use {state::WsStateCmd, input::WsInput, output::WsOutput};
+use {input::WsInput, output::WsOutput, state::WsStateCmd};
 
 #[derive(Deserialize, Debug)]
 pub struct WsInputFloatConfig {
@@ -50,7 +50,7 @@ pub struct WsInputStringConfig {
 pub enum WsStateInputConfig {
     Bool(WsInputBoolConfig),
     Float(WsInputFloatConfig),
-    String(WsInputStringConfig)
+    String(WsInputStringConfig),
 }
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ pub struct WsStateConfig {
 }
 
 #[derive(Debug)]
-pub struct WsServerConfig{
+pub struct WsServerConfig {
     pub state_config: WsStateConfig,
 }
 
@@ -79,19 +79,20 @@ pub struct WsServer {
 }
 
 impl WsServer {
-   pub async fn new(ws_server_config: WsServerConfig) -> WsServer {
-
+    pub async fn new(ws_server_config: WsServerConfig) -> WsServer {
         //create ws_state manager
         let state_config = ws_server_config.state_config;
         let ws_state = WsState::new(&state_config);
         let ws_state_cmd_tx = ws_state.cmd_tx.clone();
-        
+
         //web socket mananger (subscribes to input and output updates, sends input updates)
         let ws_mgr = WsManager::new(ws_state.cmd_tx.clone());
 
-        //get input subscription for ioc inputs 
+        //get input subscription for ioc inputs
         let (subs_tx, subs_rx) = oneshot::channel();
-        let subs_cmd = WsStateCmd::SubscribeInputs { subs_callback: subs_tx };
+        let subs_cmd = WsStateCmd::SubscribeInputs {
+            subs_callback: subs_tx,
+        };
         ws_state_cmd_tx.send(subs_cmd).await.unwrap();
         let subs = subs_rx.await.unwrap();
 
@@ -99,16 +100,13 @@ impl WsServer {
         let inputs = WsInput::from_subscription(subs);
 
         //tasks to write outputs to ws_state
-        let outputs = WsOutput::from_config(
-            ws_state_cmd_tx, 
-            state_config.output_configs
-        );
+        let outputs = WsOutput::from_config(ws_state_cmd_tx, state_config.output_configs);
 
-        //service to server up static files 
+        //service to server up static files
         let static_service = ServeDir::new("./assets")
             .append_index_html_on_directories(true)
             .not_found_service(ServeFile::new("./assets/404.html"));
-    
+
         //router serves up static files or attemps to connect a websocket
         let router = Router::new()
             .fallback_service(static_service)
@@ -117,10 +115,10 @@ impl WsServer {
                 TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::default().include_headers(false)),
             );
-    
+
         //start listening for http connections
         let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-        tracing::info!("listening on {}", addr);    
+        tracing::info!("listening on {}", addr);
         let handle = tokio::spawn(async move {
             //listen for sockets
             axum::Server::bind(&addr)
@@ -130,10 +128,10 @@ impl WsServer {
         });
 
         //return
-        WsServer{
-            handle: handle,
-            inputs: inputs,
-            outputs: outputs,
+        WsServer {
+            handle,
+            inputs,
+            outputs,
         }
     }
 }
@@ -143,10 +141,5 @@ async fn ws(
     ws: WebSocketUpgrade,
     State(ws_sender): State<mpsc::Sender<WebSocket>>,
 ) -> impl IntoResponse {
-    
-    ws.on_upgrade(move |socket| {
-        async move {
-            ws_sender.send(socket).await.unwrap()
-       }
-    })
+    ws.on_upgrade(move |socket| async move { ws_sender.send(socket).await.unwrap() })
 }
