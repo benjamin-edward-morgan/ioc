@@ -6,7 +6,7 @@ use crate::{Input, InputSource};
 
 pub struct ConstantInput {
     v: f64,
-    tx: broadcast::Sender<f64>,
+    _tx: broadcast::Sender<f64>,
     rx: broadcast::Receiver<f64>,
 }
 
@@ -15,19 +15,7 @@ impl ConstantInput {
         let (tx, rx) = broadcast::channel(128);
 
         match tx.send(value) {
-            Ok(_) => ConstantInput { v: value, tx, rx },
-            Err(e) => {
-                warn!("err! {:?}", e);
-                panic!();
-            }
-        }
-    }
-
-    pub fn set(&mut self, x: f64) {
-        self.v = x;
-
-        match self.tx.send(x) {
-            Ok(_) => {}
+            Ok(_) => ConstantInput { v: value, _tx: tx,  rx },
             Err(e) => {
                 warn!("err! {:?}", e);
                 panic!();

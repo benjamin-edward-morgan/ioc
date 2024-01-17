@@ -25,6 +25,7 @@ impl SecondOrderOde {
     x0, dx0 are the start value, and start derivative
     period_ms is the target number of miliseconds between frames
     */
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         a: InputSource<f64>,
         b: InputSource<f64>,

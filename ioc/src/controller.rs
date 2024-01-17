@@ -144,34 +144,3 @@ impl ControllerBuilder for DirectControllerConfig {
         }
     }
 }
-
-//transforms the input by the supplied function, sends to output
-pub struct TransformController {
-    pub handle: JoinHandle<()>,
-}
-
-impl TransformController {
-    pub fn new<I, O, F>(
-        mut source: InputSource<I>,
-        sink: OutputSink<O>,
-        xform: F,
-    ) -> TransformController
-    where
-        I: Send + Clone + 'static,
-        O: Send + Clone + 'static,
-        F: Send + Copy + FnOnce(I) -> O + 'static,
-    {
-        let handle = tokio::spawn(async move {
-            if sink.tx.send(xform(source.start)).await.is_ok() {
-                while let Ok(i) = source.rx.recv().await {
-                    if sink.tx.send(xform(i)).await.is_err() {
-                        break;
-                    }
-                }
-                warn!("transform controller shutting down!");
-            }
-        });
-
-        TransformController { handle }
-    }
-}
