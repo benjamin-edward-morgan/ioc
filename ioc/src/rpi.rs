@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use serde::Deserialize;
-use rppal::gpio::Gpio;
 use crate::config::{InputBox, OutputBox};
-
+use rppal::gpio::Gpio;
+use serde::Deserialize;
 
 mod digital;
 mod pwm;
@@ -21,13 +20,12 @@ pub enum InputRpiConfig {
 impl InputRpiConfig {
     pub fn build(&self, gpio: &Gpio) -> InputBox {
         match self {
-            Self::RpiDigitalBoolInput(cfg) => InputBox::Bool(
-                Box::new(digital::GpioDigitalBoolInput::new(gpio, cfg))
-            ),
+            Self::RpiDigitalBoolInput(cfg) => {
+                InputBox::Bool(Box::new(digital::GpioDigitalBoolInput::new(gpio, cfg)))
+            }
         }
     }
 }
-
 
 #[derive(Deserialize, Debug)]
 pub struct RpiPwmFloatOutputConfig {
@@ -42,14 +40,12 @@ pub enum OutputRpiConfig {
 impl OutputRpiConfig {
     fn build(&self, gpio: &Gpio) -> OutputBox {
         match self {
-            Self::RpiPwmFloatOutput(cfg) => OutputBox::Float(
-                Box::new(pwm::GpioPwmFloatOutput::new(gpio, cfg))
-            ),
+            Self::RpiPwmFloatOutput(cfg) => {
+                OutputBox::Float(Box::new(pwm::GpioPwmFloatOutput::new(gpio, cfg)))
+            }
         }
     }
 }
-
-
 
 pub struct RpiBuilder {
     inputs: HashMap<String, InputRpiConfig>,
@@ -61,7 +57,10 @@ impl RpiBuilder {
         inputs: HashMap<String, InputRpiConfig>,
         outputs: HashMap<String, OutputRpiConfig>,
     ) -> Self {
-        Self { inputs: inputs, outputs: outputs }
+        Self {
+            inputs: inputs,
+            outputs: outputs,
+        }
     }
 
     pub fn build(self) -> Rpi {
@@ -78,11 +77,10 @@ impl RpiBuilder {
             outputs.insert(k, v.build(&gpio));
         }
 
-        Rpi { 
+        Rpi {
             inputs: inputs,
             outputs: outputs,
         }
-
     }
 }
 

@@ -30,5 +30,16 @@ sudo systemctl enable myservice.service
 
 Check the logs:
 ```shell
+journalctl -f | grep myservice
+```
 
+
+#### IDE notes
+In VS Code with the rust-analyzer extension, it is helpful to add the following to `settings.json`
+```
+{
+    "rust-analyzer.cargo.features": [
+        "raspi"
+    ]
+}
 ```

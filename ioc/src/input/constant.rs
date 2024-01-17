@@ -2,39 +2,20 @@ use serde::Deserialize;
 use tokio::sync::broadcast;
 use tracing::warn;
 
-use crate::{Input,InputSource};
+use crate::{Input, InputSource};
 
 pub struct ConstantInput {
     v: f64,
-    tx: broadcast::Sender<f64>,
-    rx: broadcast::Receiver<f64>
+    _tx: broadcast::Sender<f64>,
+    rx: broadcast::Receiver<f64>,
 }
 
 impl ConstantInput {
     pub fn new(value: f64) -> ConstantInput {
-
         let (tx, rx) = broadcast::channel(128);
 
         match tx.send(value) {
-            Ok(_) => {
-                ConstantInput{
-                    v: value,
-                    tx: tx,
-                    rx: rx
-                }
-            },
-            Err(e) => {
-                warn!("err! {:?}", e);
-                panic!();
-            }
-        }
-    }
-
-    pub fn set(&mut self, x: f64) {
-        self.v = x;
-
-        match self.tx.send(x) {
-            Ok(_) => {},
+            Ok(_) => ConstantInput { v: value, _tx: tx,  rx },
             Err(e) => {
                 warn!("err! {:?}", e);
                 panic!();
@@ -45,21 +26,21 @@ impl ConstantInput {
 
 impl Input<f64> for ConstantInput {
     fn source(&self) -> InputSource<f64> {
-        InputSource{
+        InputSource {
             start: self.v,
-            rx: self.rx.resubscribe()
+            rx: self.rx.resubscribe(),
         }
     }
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ConstantInputConfig {
-    value: f64
+    value: f64,
 }
 
-impl Into<Box<dyn Input<f64>>> for &ConstantInputConfig {
-    fn into(self) -> Box<dyn Input<f64>> {
-        let input = ConstantInput::new(self.value);
+impl From<&ConstantInputConfig> for Box<dyn Input<f64>> {
+    fn from(val: &ConstantInputConfig) -> Self {
+        let input = ConstantInput::new(val.value);
         Box::new(input)
     }
 }

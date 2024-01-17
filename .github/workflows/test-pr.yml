@@ -1,0 +1,14 @@
+name: Test PR
+run-name: Testing a PR by ${{github.actor}}
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    run: ls -lha 
+    container: 
+      image: rust:alpine3.19
+      volumes:
+        - .:/src/ioc
+    steps:
+      - name: testing
+        run: ls -lha && pwd

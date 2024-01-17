@@ -1,11 +1,11 @@
 use tokio::sync::{broadcast, mpsc};
 
+mod channel;
+pub mod config;
+mod controller;
 mod input;
 mod output;
-mod channel;
-mod controller;
 mod sim;
-pub mod config;
 
 #[cfg(feature = "ws-server")]
 mod ws;
@@ -15,7 +15,7 @@ mod rpi;
 
 pub struct InputSource<T> {
     pub start: T,
-    pub rx: broadcast::Receiver<T>
+    pub rx: broadcast::Receiver<T>,
 }
 
 pub trait Input<T> {
@@ -23,7 +23,7 @@ pub trait Input<T> {
 }
 
 pub struct OutputSink<T> {
-    pub tx: mpsc::Sender<T>
+    pub tx: mpsc::Sender<T>,
 }
 
 pub trait Output<T> {

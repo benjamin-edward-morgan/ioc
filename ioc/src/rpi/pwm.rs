@@ -1,7 +1,7 @@
 use rppal::gpio::Gpio;
 
-use tokio::{sync::mpsc, task::JoinHandle};
 use crate::{Output, OutputSink};
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use super::RpiPwmFloatOutputConfig;
 
@@ -21,17 +21,17 @@ impl GpioPwmFloatOutput {
             }
         });
 
-        GpioPwmFloatOutput { 
+        GpioPwmFloatOutput {
             tx: tx,
-            handle: handle
+            handle: handle,
         }
     }
 }
 
 impl Output<f64> for GpioPwmFloatOutput {
     fn sink(&self) -> OutputSink<f64> {
-        OutputSink { 
-            tx: self.tx.clone() 
+        OutputSink {
+            tx: self.tx.clone(),
         }
     }
 }

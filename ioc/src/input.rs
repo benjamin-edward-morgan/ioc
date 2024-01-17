@@ -1,2 +1,2 @@
-pub mod noise;
 pub mod constant;
+pub mod noise;
