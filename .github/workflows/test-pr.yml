@@ -11,5 +11,8 @@ jobs:
         with:
           toolchain: 1.72.0
           components: clippy rustfmt
+      - name: ls 
+        run: ls -lha && pwd
       - name: Rustfmt
+        working-directory: ./scripts
         run: cargo fmt --all -- --check
