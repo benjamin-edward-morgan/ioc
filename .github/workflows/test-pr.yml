@@ -14,5 +14,5 @@ jobs:
       - name: ls 
         run: ls -lha && pwd
       - name: Rustfmt
-        working-directory: ./scripts
+        working-directory: ioc
         run: cargo fmt --all -- --check
