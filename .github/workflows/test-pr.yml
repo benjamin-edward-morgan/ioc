@@ -10,6 +10,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.72.0
-          components: [clippy, rustfmt]
+          components: clippy rustfmt
       - name: Rustfmt
         run: cargo fmt --all -- --check
