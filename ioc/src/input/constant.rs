@@ -15,7 +15,11 @@ impl ConstantInput {
         let (tx, rx) = broadcast::channel(128);
 
         match tx.send(value) {
-            Ok(_) => ConstantInput { v: value, _tx: tx,  rx },
+            Ok(_) => ConstantInput {
+                v: value,
+                _tx: tx,
+                rx,
+            },
             Err(e) => {
                 warn!("err! {:?}", e);
                 panic!();

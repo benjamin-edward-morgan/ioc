@@ -16,3 +16,6 @@ jobs:
       - name: Rustfmt
         working-directory: ioc
         run: cargo fmt -- --check
+      - name: Clippy
+        working-directory: ioc 
+        run: cargo clippy -- --check
