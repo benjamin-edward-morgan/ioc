@@ -201,7 +201,7 @@ impl IocConfig {
             .iter()
             .for_each(|(k, c)| match c.try_build(&ports) {
                 Ok(handle) => handles.push(handle),
-                Err(cbe) => panic!("Error building controller {}: {}", k, cbe),
+                Err(cbe) => warn!("Error building controller {}: {}", k, cbe),
             });
 
         futures::future::join_all(handles).await;

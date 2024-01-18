@@ -22,7 +22,6 @@ async fn main() {
         match IocConfig::new(cfg_name) {
             Ok(cfg) => {
                 let ioc = cfg.start();
-                panic!();
                 ioc.await;
             }
             Err(err) => {

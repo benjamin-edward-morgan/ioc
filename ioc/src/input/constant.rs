@@ -14,16 +14,14 @@ impl ConstantInput {
     pub fn new(value: f64) -> ConstantInput {
         let (tx, rx) = broadcast::channel(128);
 
-        match tx.send(value) {
-            Ok(_) => ConstantInput {
-                v: value,
-                _tx: tx,
-                rx,
-            },
-            Err(e) => {
-                warn!("err! {:?}", e);
-                panic!();
-            }
+        if let Err(err) = tx.send(value) {
+            warn!("err! {:?}", err);
+        }
+
+        ConstantInput {
+            v: value,
+            _tx: tx,
+            rx,
         }
     }
 }

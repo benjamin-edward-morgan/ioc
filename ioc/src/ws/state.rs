@@ -34,13 +34,16 @@ impl From<&WsStateInputConfig> for WsInputStateValue {
         match value {
             WsStateInputConfig::Bool(cfg) => WsInputStateValue::Bool { b: cfg.start },
             WsStateInputConfig::Float(cfg) => {
+                let mut min = cfg.min;
+                let mut max = cfg.max;
                 if cfg.min > cfg.max {
-                    panic!("min must be <= max");
+                    max = cfg.min;
+                    min = cfg.max;
                 }
                 WsInputStateValue::Float {
                     f: cfg.start,
-                    min: cfg.min,
-                    max: cfg.max,
+                    min,
+                    max,
                     step: cfg.step,
                 }
             }
