@@ -13,6 +13,9 @@ mod ws;
 #[cfg(feature = "rpi")]
 mod rpi;
 
+#[cfg(feature = "devices")]
+mod devices;
+
 pub struct InputSource<T> {
     pub start: T,
     pub rx: broadcast::Receiver<T>,

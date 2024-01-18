@@ -118,21 +118,9 @@ impl IocConfig {
                 warn!("There are no ws inputs or outputs! Running with the ws-server feature enabled is moot.");
             }
 
-            //todo: eliminate this conversion
-            let mut wsi_cfgs = HashMap::with_capacity(input_ws_srv_features.len());
-            for (k, i) in input_ws_srv_features {
-                wsi_cfgs.insert(k.to_string(), {
-                    match i {
-                        InputWsServerConfig::WsFloat(cfg) => WsStateInputConfig::Float(cfg),
-                        InputWsServerConfig::WsBool(cfg) => WsStateInputConfig::Bool(cfg),
-                        InputWsServerConfig::WsString(cfg) => WsStateInputConfig::String(cfg),
-                    }
-                });
-            }
-
             let srv_cfg = WsServerConfig {
                 state_config: WsStateConfig {
-                    input_configs: wsi_cfgs,
+                    input_configs: input_ws_srv_features,
                     output_configs: output_ws_srv_features,
                     channel_size: 64,
                 },
@@ -240,19 +228,12 @@ impl InputCoreConfig {
     }
 }
 
-#[cfg(feature = "ws-server")]
-pub enum InputWsServerConfig {
-    WsFloat(WsInputFloatConfig),
-    WsBool(WsInputBoolConfig),
-    WsString(WsInputStringConfig),
-}
-
 //InputConfig, but bucketed by feature
 pub enum InputConfigFeature {
     Core(InputCoreConfig),
 
     #[cfg(feature = "ws-server")]
-    WsServer(InputWsServerConfig),
+    WsServer(WsStateInputConfig),
 
     #[cfg(feature = "rpi")]
     Rpi(InputRpiConfig),
@@ -266,15 +247,15 @@ impl From<InputConfig> for InputConfigFeature {
 
             #[cfg(feature = "ws-server")]
             InputConfig::WsFloat(cfg) => {
-                InputConfigFeature::WsServer(InputWsServerConfig::WsFloat(cfg))
+                InputConfigFeature::WsServer(WsStateInputConfig::Float(cfg))
             }
             #[cfg(feature = "ws-server")]
             InputConfig::WsBool(cfg) => {
-                InputConfigFeature::WsServer(InputWsServerConfig::WsBool(cfg))
-            }
+                InputConfigFeature::WsServer(WsStateInputConfig::Bool(cfg))
+            },
             #[cfg(feature = "ws-server")]
             InputConfig::WsString(cfg) => {
-                InputConfigFeature::WsServer(InputWsServerConfig::WsString(cfg))
+                InputConfigFeature::WsServer(WsStateInputConfig::String(cfg))
             }
 
             #[cfg(feature = "rpi")]

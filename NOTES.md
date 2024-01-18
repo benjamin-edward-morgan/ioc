@@ -39,7 +39,7 @@ In VS Code with the rust-analyzer extension, it is helpful to add the following 
 ```
 {
     "rust-analyzer.cargo.features": [
-        "raspi"
+        "rpi"
     ]
 }
 ```
