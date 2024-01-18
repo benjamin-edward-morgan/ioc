@@ -3,7 +3,7 @@ run-name: Testing a PR by ${{github.actor}}
 on: [pull_request]
 jobs:
   test:
-    name: check cargo fmt, clippy, build
+    name: cargo test, fmt, and clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,8 +11,12 @@ jobs:
         with:
           toolchain: 1.72.0
           components: clippy rustfmt
-      - name: ls 
-        run: ls -lha && pwd
-      - name: Rustfmt
+      - name: test
+        working-directory: ioc
+        run: cargo test
+      - name: fmt
         working-directory: ioc
         run: cargo fmt -- --check
+      - name: clippy
+        working-directory: ioc 
+        run: cargo clippy -- -D warnings

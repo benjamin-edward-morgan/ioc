@@ -190,7 +190,7 @@ impl ControllerBuilder for PidControllerConfig {
             }
             (p, i, d, sp, pv, out) => {
                 let mut errs: Vec<ControllerBuilderError> = Vec::with_capacity(6);
-                for x in vec![p, i, d, sp, pv] {
+                for x in [p, i, d, sp, pv] {
                     if let Err(e) = x {
                         errs.push(e)
                     }

@@ -148,7 +148,7 @@ impl ControllerBuilder for SecondOrderOdeConfig {
             }
             (a, b, c, f, x) => {
                 let mut errs = Vec::with_capacity(5);
-                for x in vec![a, b, c, f] {
+                for x in [a, b, c, f] {
                     if let Err(e) = x {
                         errs.push(e)
                     }
