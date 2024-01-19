@@ -1,0 +1,13 @@
+[package]
+name = "ioc_rpi_gpio"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+ioc_core = { path = "../ioc_core" }
+
+rppal = { version = "0.16.1" }
+
+tracing.workspace = true
+tokio.workspace = true
+serde.workspace = true
