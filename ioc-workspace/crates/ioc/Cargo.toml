@@ -4,11 +4,14 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-rpi = ["dep:ioc_rpi_gpio"]
+default = [ "server" ]
+rpi = [ "dep:ioc_rpi_gpio" ]
+server = [ "dep:ioc_server" ]
 
 [dependencies]
-ioc_core = { path = "../ioc_core"}
-ioc_rpi_gpio = { path = "../ioc_rpi_gpio", optional = true}
+ioc_core = { path = "../ioc_core" }
+ioc_rpi_gpio = { path = "../ioc_rpi_gpio", optional = true }
+ioc_server = { path = "../ioc_server", optional = true }
 
 tracing.workspace = true
 tracing-subscriber.workspace = true

@@ -30,8 +30,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 
 use ioc_core::controller::IdentityController;
-
-use ioc_server::{Server, ServerConfig};
+use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig};
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() {
@@ -43,18 +43,35 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let input_configs = HashMap::from([
+        ("ws_float_in", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 0.01 }),
+        ("ws_bool_in", ServerInputConfig::Bool{ start: false }),
+        ("ws_string_in", ServerInputConfig::String{ start: "".to_string(), max_length: 16 }),
+    ]);
 
+    let output_configs = HashMap::from([
+        ("ws_float_out", ServerOutputConfig::Float),
+        ("ws_bool_out", ServerOutputConfig::Bool),
+        ("ws_string_out", ServerOutputConfig::String),
+    ]);
 
-    let server_builder = ServerBuilder::try_from(&ServerConfig{port: 8080}).unwrap();
+    let ws_endpoint_config = EndpointConfig::WebSocket {
+        inputs: vec!["ws_float_in", "ws_bool_in", "ws_string_in"],
+        outputs: vec!["ws_float_out", "ws_bool_out", "ws_string_out"],
+    };
 
-    server_builder.add_endpoint("/", EndpointConfig::Static{ port: 8080, dir: "/foo/bar" });
+    let cfg = ServerConfig{
+        port: 8080,
+        root_context: "/",
+        inputs: input_configs,
+        outputs: output_configs,
+        endpoints: HashMap::from([
+            ("/ws", ws_endpoint_config),
+        ])
+    };
+       
+    let server = Server::try_build(cfg).unwrap();
 
-    server_builder.add_endpoint("/ws", EndpointConfig::Websocket{ 
-        inputs: HashMap("asdf" -> WebsocketInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 0.01} ),
-        outouts: HashMap("qwerty" -> WebsocketOutputConfig::Float),
-    }).unwrap();
-
-    let server = server_builder.try_build().unwrap();
-
-    server.handle.await
+    server.handle.await.unwrap()
+    
 }
