@@ -7,3 +7,5 @@ tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1.0", features = ["rt-multi-thread","sync","macros"] }
 serde = { version = "1.0", features = ["derive"] }
+futures = { version = "0.3" }
+

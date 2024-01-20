@@ -16,3 +16,4 @@ serde_json = { version = "1.0" }
 tracing.workspace = true
 tokio.workspace = true
 serde.workspace = true
+futures.workspace = true
