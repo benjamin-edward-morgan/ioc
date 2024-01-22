@@ -1,5 +1,5 @@
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
+use tracing::{error,info};
 // use ioc_core::controller::IdentityController;
 
 // use ioc_rpi_gpio::{RpiGpio,RpiGpioConfig};
@@ -60,18 +60,28 @@ async fn main() {
         outputs: vec!["ws_float_out", "ws_bool_out", "ws_string_out"],
     };
 
+    // let static_endpoint_config = EndpointConfig::Static {
+    //     directory: "assets"
+    // };
+
     let cfg = ServerConfig{
         port: 8080,
         root_context: "/",
         inputs: input_configs,
         outputs: output_configs,
         endpoints: HashMap::from([
+            // ("/", static_endpoint_config),
             ("/ws", ws_endpoint_config),
-        ])
+        ]),
+        state_channel_size: 100,
     };
        
-    let server = Server::try_build(cfg).unwrap();
+    let server = Server::try_build(cfg).await.unwrap();
 
-    server.handle.await.unwrap()
+    if let Err(err) = server.handle.await {
+        error!("Server is exiting unsuccessfully :(\n{:?}", err);
+    } else {
+        info!("Server is exiting.")
+    }
     
 }

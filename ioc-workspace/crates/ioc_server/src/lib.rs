@@ -3,22 +3,21 @@ pub(crate) mod server;
 
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
-use tracing::{info,error};
-use axum::response::IntoResponse;
-use axum::routing::get;
+use tracing::info;
+
 use std::net::SocketAddr;
-use tower_http::trace::TraceLayer;
 use tower_http::trace::DefaultMakeSpan;
-use tower_http::services::ServeDir;
-use tower_http::services::ServeFile;
+use tower_http::trace::TraceLayer;
+
+use serde::Deserialize;
 
 use crate::error::ServerBuildError;
 use crate::server::{
-    state::ServerState, 
-    ServerInput, ServerInputBuilder, 
-    ServerOutput, ServerOutputBuilder,
+    endpoint::Endpoint, io::input::ServerInput, io::output::ServerOutput, io::ServerIoBuilder,
+    state::ServerState,
 };
 
+#[derive(Deserialize)]
 pub enum ServerInputConfig {
     Float {
         start: f64,
@@ -35,28 +34,32 @@ pub enum ServerInputConfig {
     },
 }
 
+#[derive(Deserialize)]
 pub enum ServerOutputConfig {
     Float,
     Bool,
     String,
 }
 
+#[derive(Deserialize)]
 pub enum EndpointConfig<'a> {
     WebSocket {
         inputs: Vec<&'a str>,
         outputs: Vec<&'a str>,
     },
     Static {
-        directory: String,
+        directory: &'a str,
     },
 }
 
+#[derive(Deserialize)]
 pub struct ServerConfig<'a> {
     pub port: u16,
     pub root_context: &'a str,
     pub inputs: HashMap<&'a str, ServerInputConfig>,
     pub outputs: HashMap<&'a str, ServerOutputConfig>,
     pub endpoints: HashMap<&'a str, EndpointConfig<'a>>,
+    pub state_channel_size: usize,
 }
 
 pub enum TypedInput {
@@ -77,42 +80,47 @@ pub struct Server<'a> {
     pub outputs: HashMap<&'a str, TypedOutput>,
 }
 
-impl <'a> Server<'a> {
-    pub fn try_build(cfg: ServerConfig<'a>) -> Result<Self, ServerBuildError> {
-        let state = ServerState::try_build(&cfg.inputs, &cfg.outputs)?;
+impl<'a> Server<'a> {
+    pub async fn try_build(cfg: ServerConfig<'a>) -> Result<Self, ServerBuildError> {
+        info!("building server state!");
 
+        //global state
+        let state = ServerState::try_build(cfg.state_channel_size, &cfg.inputs, &cfg.outputs)?;
         let cmd_tx = state.cmd_tx;
 
+        //create the inputs and outputs
         let mut inputs = HashMap::with_capacity(cfg.inputs.len());
         let mut outputs = HashMap::with_capacity(cfg.outputs.len());
-
+        let io_builder = ServerIoBuilder {
+            cmd_tx: cmd_tx.clone(),
+            channel_size: 100,
+        };
         for (key, input_config) in cfg.inputs {
-            let srv_input = ServerInputBuilder::try_build(&cmd_tx, input_config)?;
+            let srv_input = io_builder.try_build_input(key, input_config).await?;
             inputs.insert(key, srv_input);
         }
-
         for (key, output_config) in cfg.outputs {
-            let srv_output = ServerOutputBuilder::try_build(&cmd_tx, output_config)?;
+            let srv_output = io_builder.try_build_output(key, output_config).await?;
             outputs.insert(key, srv_output);
         }
+
+        //build router service from endpoint configs
+        let mut router_service = axum::routing::Router::new();
+        for (key, ep_config) in cfg.endpoints {
+            let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
+            router_service = router_service.route(key, endpoint.method_router());
+        }
+        router_service = router_service.layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::default().include_headers(false)),
+        );
 
         //bind to 0.0.0.0 on the given port
         let socket_addr: SocketAddr = SocketAddr::from(([0, 0, 0, 0], cfg.port));
 
-        let static_service = ServeDir::new("./assets")
-        .append_index_html_on_directories(true)
-        .not_found_service(ServeFile::new("./assets/404.html"));
-
-
-        let router_service = axum::routing::Router::new()
-            .nest_service("/static", static_service)
-            .layer(
-                TraceLayer::new_for_http()
-                    .make_span_with(DefaultMakeSpan::default().include_headers(false)),
-            );
-
+        //start handling requests
         let server_handle = tokio::spawn(async move {
-            axum::Server::bind(&socket_addr) 
+            axum::Server::bind(&socket_addr)
                 .serve(router_service.into_make_service())
                 .await
                 .unwrap();
