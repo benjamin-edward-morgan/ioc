@@ -1,7 +1,10 @@
-
 #[derive(Debug)]
 pub struct ServerBuildError {
-    message: String,
+    pub message: String,
 }
 
-
+impl ServerBuildError {
+    pub(crate) fn new(s: String) -> Self {
+        Self { message: s }
+    }
+}
