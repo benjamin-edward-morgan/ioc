@@ -118,6 +118,42 @@ impl From<WsStateUpdate> for ServerInputState {
     }
 }
 
+impl From<ServerInputState> for WsStateUpdate {
+    fn from(state: ServerInputState) -> Self {
+        match state {
+            ServerInputState::Float{ value, .. } => 
+                WsStateUpdate::Float{ value },
+            ServerInputState::Bool{ value } => 
+                WsStateUpdate::Bool{ value },
+            ServerInputState::String{ value, .. } => 
+                WsStateUpdate::String{ value },
+        }
+    }
+}
+
+impl From<ServerOutputState> for Option<WsStateUpdate> {
+    fn from(state: ServerOutputState) -> Self {
+        match state {
+            ServerOutputState::Float{ value, .. } => {
+                value.map(|value| {
+                    WsStateUpdate::Float{ value }
+                })
+            },  
+            ServerOutputState::Bool{ value } => {
+                value.map(|value| {
+                    WsStateUpdate::Bool{ value }
+                })
+            },
+            ServerOutputState::String{ value, .. } => {
+                value.map(|value| {
+                    WsStateUpdate::String{ value: value.to_string() }
+                })
+            },
+        }
+    }
+}
+
+
 impl From<HashMap<String, WsStateUpdate>> for StateUpdate {
     fn from(update: HashMap<String, WsStateUpdate>) -> Self {
         
@@ -138,4 +174,29 @@ pub struct WsUpdateMessage {
     pub inputs: HashMap<String, WsStateUpdate>,
     pub outputs: HashMap<String, WsStateUpdate>,
     pub time: WsTimestamp,
+}
+
+impl From<StateUpdate> for WsUpdateMessage {
+    fn from(update: StateUpdate) -> Self {
+
+        let mut inputs = HashMap::with_capacity(update.inputs.len());
+        for (k, i) in update.inputs {
+            inputs.insert(k, i.into());
+        }
+
+        let mut outputs = HashMap::with_capacity(update.outputs.len());
+        for (k, o) in update.outputs {
+            if let Some(o) = o.into() {
+                outputs.insert(k, o);
+            }
+        }
+
+        let time = WsTimestamp::now();
+        
+        Self{
+            inputs,
+            outputs,
+            time,
+        }
+    }
 }

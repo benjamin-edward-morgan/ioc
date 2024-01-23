@@ -58,13 +58,33 @@ impl ServerIoBuilder {
 
         let typed_input = match (config, start) {
             (ServerInputConfig::Float { .. }, ServerInputState::Float { value, .. }) => {
-                let input =
-                    ServerInput::new(key.to_string(), self.channel_size, *value, subs.update_rx);
+                let input = ServerInput::new(
+                    key.to_string(), 
+                    self.channel_size, 
+                    *value, 
+                    subs.update_rx,
+                    | state: &ServerInputState | {
+                        match state {
+                            ServerInputState::Float{ value, .. } => Some(*value),
+                            _ => None
+                        }
+                    },
+                );
                 Ok(TypedInput::Float(input))
             }
             (ServerInputConfig::Bool { .. }, ServerInputState::Bool { value }) => {
-                let input =
-                    ServerInput::new(key.to_string(), self.channel_size, *value, subs.update_rx);
+                let input = ServerInput::new(
+                    key.to_string(), 
+                    self.channel_size, 
+                    *value, 
+                    subs.update_rx,
+                    | state: &ServerInputState | {
+                        match state {
+                            ServerInputState::Bool{ value } => Some(*value),
+                            _ => None
+                        }
+                    },
+                );
                 Ok(TypedInput::Bool(input))
             }
             (ServerInputConfig::String { .. }, ServerInputState::String { value, .. }) => {
@@ -73,6 +93,12 @@ impl ServerIoBuilder {
                     self.channel_size,
                     value.clone(),
                     subs.update_rx,
+                    | state: &ServerInputState | {
+                        match state {
+                            ServerInputState::String{ value, .. } => Some(value.to_string()),
+                            _ => None
+                        }
+                    },
                 );
                 Ok(TypedInput::String(input))
             }

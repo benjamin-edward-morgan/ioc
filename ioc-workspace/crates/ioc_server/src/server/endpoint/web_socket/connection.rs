@@ -3,11 +3,11 @@ use axum::extract::ws::{WebSocket, Message};
 use futures::{StreamExt,SinkExt};
 use tokio::task::JoinHandle;
 use tokio::sync::mpsc;
-use tracing::{warn,error,info};
+use tracing::{warn,info};
 use std::collections::HashMap;
 
 use crate::server::state::{Subscription,StateCmd};
-use super::message::{WsInitialMessage,WsStateUpdate};
+use super::message::{WsInitialMessage,WsStateUpdate,WsUpdateMessage};
 
 pub(crate) struct WebSocketConnection {
     handle: JoinHandle<()>
@@ -31,11 +31,11 @@ impl WebSocketConnection {
         match ws_tx.send(Message::Text(json)).await {
             Ok(_) => {
                 info!("sent intial ws message! starting send task ... ");
-
-
                 let send_task = tokio::spawn(async move {
-                    while let Ok(update) = update_rx .recv().await {
-                        println!("yay update!: {:?}", update);
+                    while let Ok(update) = update_rx.recv().await {
+                        let update_msg: WsUpdateMessage = update.into();
+                        let json = serde_json::to_string(&update_msg).unwrap();
+                        ws_tx.send(Message::Text(json)).await.unwrap();
                     }
                     info!("websocket send task is done!");
                 });
@@ -44,14 +44,13 @@ impl WebSocketConnection {
                     while let Some(Ok(message)) = ws_rx.next().await {
                         match message {
                             Message::Text(text) => {
-                                println!("yay got {}", text);
                                 match serde_json::from_str::<HashMap<String,WsStateUpdate>>(&text) {
                                     Ok(updates) => {
                                         let state_cmd = StateCmd::Update(updates.into());
                                         state_cmd_tx.send(state_cmd).await.unwrap();
                                     },
                                     Err(err) => {
-                                        warn!("could not prse {}", err);
+                                        warn!("could not parse {}", err);
                                     }
                                 }
                             },
