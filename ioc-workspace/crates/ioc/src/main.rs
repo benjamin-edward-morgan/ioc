@@ -30,7 +30,7 @@ use tracing::{error,info};
 
 
 use ioc_core::controller::IdentityController;
-use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig};
+use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
 use std::collections::HashMap;
 
 #[tokio::main]
@@ -77,6 +77,35 @@ async fn main() {
     };
        
     let server = Server::try_build(cfg).await.unwrap();
+
+    match (
+        server.inputs.get("ws_float_in"),
+        server.inputs.get("ws_bool_in"),
+        server.inputs.get("ws_string_in"),
+        server.outputs.get("ws_float_out"),
+        server.outputs.get("ws_bool_out"),
+        server.outputs.get("ws_string_out"),
+    ) {
+        (
+            Some(TypedInput::Float(ws_float_in)),
+            Some(TypedInput::Bool(ws_bool_in)),
+            Some(TypedInput::String(ws_string_in)),
+            Some(TypedOutput::Float(ws_float_out)),
+            Some(TypedOutput::Bool(ws_bool_out)),
+            Some(TypedOutput::String(ws_string_out)),
+        ) => {
+            let idc0 = IdentityController::new(ws_float_in, ws_float_out);
+            let idc1 = IdentityController::new(ws_bool_in, ws_bool_out);
+            let idc2 = IdentityController::new(ws_string_in, ws_string_out);
+            
+        },
+        (
+            _, _, _, _, _, _,
+        ) => {
+            panic!("wrong!");
+        }
+    }
+
 
     if let Err(err) = server.handle.await {
         error!("Server is exiting unsuccessfully :(\n{:?}", err);

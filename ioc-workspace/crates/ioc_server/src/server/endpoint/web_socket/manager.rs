@@ -15,7 +15,7 @@ impl WebSocketManager {
     pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: Vec<&str>, outputs: Vec<&str>) -> Self {
 
         let inputs: HashSet<String> = inputs.iter().map(|s| s.to_string()).collect();
-        let outputs: HashSet<String> = inputs.iter().map(|s| s.to_string()).collect();
+        let outputs: HashSet<String> = outputs.iter().map(|s| s.to_string()).collect();
         let (websocket_tx, mut websocket_rx) = mpsc::channel(10);
 
         let task_state_cmd_tx = cmd_tx.clone();
@@ -49,7 +49,7 @@ impl WebSocketManager {
                 if let Some(subscription) = subs_option {
                     info!("got a subscription!");
 
-                    let connection = WebSocketConnection::new(
+                    let _connection = WebSocketConnection::new(
                         &task_state_cmd_tx,
                         websocket,
                         subscription

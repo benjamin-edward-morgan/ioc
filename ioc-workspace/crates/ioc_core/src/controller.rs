@@ -16,8 +16,12 @@ impl IdentityController {
 
         let mut source = input.source();
         let sink = output.sink();
+
         
         let handle = tokio::spawn(async move {
+
+            sink.tx.send(source.start).await.unwrap();
+
             loop {
                 match source.rx.recv().await {
                     Ok(t) => {

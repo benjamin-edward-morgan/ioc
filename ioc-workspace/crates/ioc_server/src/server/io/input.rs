@@ -1,4 +1,4 @@
-use crate::server::state::StateUpdate;
+use crate::server::state::{StateUpdate,ServerInputState};
 
 use ioc_core::{Input, InputSource};
 use std::sync::Arc;
@@ -19,6 +19,7 @@ impl<T: Clone + Send + 'static> ServerInput<T> {
         channel_size: usize,
         start: T,
         mut state_bcast: broadcast::Receiver<StateUpdate>,
+        transform: fn(&ServerInputState) -> Option<T>,
     ) -> Self {
         let value = Arc::new(Mutex::new(start.clone()));
         let (tx, rx) = broadcast::channel(channel_size);
@@ -26,10 +27,14 @@ impl<T: Clone + Send + 'static> ServerInput<T> {
             loop {
                 match state_bcast.recv().await {
                     Ok(update) => {
-                        println!("server input got {:?}", update);
-                        if let Err(_err) = tx.send(start.clone()) {
-                            error!("server inbput {:?} shutting down because of error sending updated broadcast value", key);
-                            break;
+                        if let Some(new_value) = update.inputs.get(&key) {
+                            if let Some(transformed) = transform(new_value) {
+                                if let Err(_err) = tx.send(transformed) {
+                                    error!("server inbput {:?} shutting down because of error sending updated broadcast value", key);
+                                    break;
+                                }
+                            }
+                            
                         }
                     }
                     Err(err) => {
