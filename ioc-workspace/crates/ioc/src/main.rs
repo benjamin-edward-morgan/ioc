@@ -30,8 +30,15 @@ use tracing::{error,info};
 
 
 use ioc_core::controller::IdentityController;
+
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
+
+use ioc_devices::devices::pca9685::{Pca9685DeviceConfig, Pca9685Device};
+use ioc_devices::devices::lsm303::{Lsm303DeviceConfig, Lsm303Device};
 use std::collections::HashMap;
+
+
+
 
 #[tokio::main]
 async fn main() {
@@ -44,33 +51,28 @@ async fn main() {
         .init();
 
     let input_configs = HashMap::from([
-        ("ws_float_in", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 0.01 }),
-        ("ws_bool_in", ServerInputConfig::Bool{ start: false }),
-        ("ws_string_in", ServerInputConfig::String{ start: "".to_string(), max_length: 16 }),
+        ("servo0", ServerInputConfig::Float{ start: 0.0, min: 0.00, max: 0.14, step: 0.001 }),
+        ("servo1", ServerInputConfig::Float{ start: 0.0, min: 0.00, max: 0.14, step: 0.001 }),
     ]);
 
-    let output_configs = HashMap::from([
-        ("ws_float_out", ServerOutputConfig::Float),
-        ("ws_bool_out", ServerOutputConfig::Bool),
-        ("ws_string_out", ServerOutputConfig::String),
-    ]);
+    let output_configs = HashMap::from([]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["ws_float_in", "ws_bool_in", "ws_string_in"],
-        outputs: vec!["ws_float_out", "ws_bool_out", "ws_string_out"],
+        inputs: vec!["servo0", "servo1"],
+        outputs: vec![],
     };
 
-    // let static_endpoint_config = EndpointConfig::Static {
-    //     directory: "assets"
-    // };
+    let static_endpoint_config = EndpointConfig::Static {
+        directory: "/home/beef/assets"
+    };
 
     let cfg = ServerConfig{
-        port: 8080,
+        port: 80,
         root_context: "/",
         inputs: input_configs,
         outputs: output_configs,
         endpoints: HashMap::from([
-            // ("/", static_endpoint_config),
+            ("/", static_endpoint_config),
             ("/ws", ws_endpoint_config),
         ]),
         state_channel_size: 100,
@@ -78,35 +80,49 @@ async fn main() {
        
     let server = Server::try_build(cfg).await.unwrap();
 
+
+
+
+    let i2c = ioc_rpi_gpio::get_bus();
+    let confg = Pca9685DeviceConfig{
+        i2c_address: 64,
+        channels: HashMap::from([
+            ("servo0-pwm", 0),
+            ("servo1-pwm", 1)
+        ])
+    };
+    let pwm = Pca9685Device::build(confg, i2c).unwrap();
+
+    // let i2c = ioc_rpi_gpio::get_bus();
+    // let confg = Lsm303DeviceConfig{
+
+    // };
+    // let mag_accel = Lsm303Device::build(confg, i2c).unwrap();
+
     match (
-        server.inputs.get("ws_float_in"),
-        server.inputs.get("ws_bool_in"),
-        server.inputs.get("ws_string_in"),
-        server.outputs.get("ws_float_out"),
-        server.outputs.get("ws_bool_out"),
-        server.outputs.get("ws_string_out"),
+        server.inputs.get("servo0"),
+        server.inputs.get("servo1"),
+        pwm.channels.get("servo0-pwm"),
+        pwm.channels.get("servo1-pwm"),
     ) {
         (
-            Some(TypedInput::Float(ws_float_in)),
-            Some(TypedInput::Bool(ws_bool_in)),
-            Some(TypedInput::String(ws_string_in)),
-            Some(TypedOutput::Float(ws_float_out)),
-            Some(TypedOutput::Bool(ws_bool_out)),
-            Some(TypedOutput::String(ws_string_out)),
+            Some(TypedInput::Float(posn0)),
+            Some(TypedInput::Float(posn1)),
+            Some(pwm0_out),
+            Some(pwm1_out),
         ) => {
-            let idc0 = IdentityController::new(ws_float_in, ws_float_out);
-            let idc1 = IdentityController::new(ws_bool_in, ws_bool_out);
-            let idc2 = IdentityController::new(ws_string_in, ws_string_out);
-            
+            let _idc0 = IdentityController::new(posn0, pwm0_out);
+            let _idc1 = IdentityController::new(posn1, pwm1_out);
         },
         (
-            _, _, _, _, _, _,
+            _, _, _, _ ,
         ) => {
             panic!("wrong!");
         }
     }
 
 
+    info!("started up!");
     if let Err(err) = server.handle.await {
         error!("Server is exiting unsuccessfully :(\n{:?}", err);
     } else {

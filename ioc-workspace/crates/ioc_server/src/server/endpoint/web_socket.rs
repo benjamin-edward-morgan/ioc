@@ -3,9 +3,9 @@ pub(crate) mod connection;
 pub(crate) mod message;
 
 use crate::server::state::StateCmd;
+use axum::Router;
 use manager::WebSocketManager;
 
-use axum::routing::method_routing::MethodRouter;
 use axum::routing::get;
 use axum::response::IntoResponse;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
@@ -25,8 +25,14 @@ impl WebSocketEndpoint {
         }
     }
 
-    pub fn method_router(&self) -> MethodRouter {
-        get(handle_ws_upgrade).with_state(self.ws_mgr.websocket_tx.clone())
+    // pub fn method_router(&self) -> MethodRouter {
+    //     get(handle_ws_upgrade).with_state(self.ws_mgr.websocket_tx.clone())
+    // }
+
+    pub fn apply(self, key: &str, router: Router) -> Router {
+        router.route(key, 
+            get(handle_ws_upgrade).with_state(self.ws_mgr.websocket_tx.clone())
+        )
     }
 }
 

@@ -6,7 +6,10 @@ edition = "2021"
 [dependencies]
 ioc_core = { path = "../ioc_core" }
 
-rppal = { version = "0.16.1" }
+rppal = { version = "0.17.1", features=["hal"] }
+embedded-hal-0 = { version = "0.2.7", package = "embedded-hal", optional = true }
+embedded-hal = { version = "1.0.0-rc.2", optional = true }
+
 
 tracing.workspace = true
 tokio.workspace = true

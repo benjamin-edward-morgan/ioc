@@ -108,7 +108,9 @@ impl<'a> Server<'a> {
         let mut router_service = axum::routing::Router::new();
         for (key, ep_config) in cfg.endpoints {
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
-            router_service = router_service.route(key, endpoint.method_router());
+            router_service = endpoint.apply(key, router_service);
+            //router_service = router_service.route(key, endpoint.method_router());
+            //router_service.route_service(key, endpoint.service());
         }
         router_service = router_service.layer(
             TraceLayer::new_for_http()
