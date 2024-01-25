@@ -4,7 +4,9 @@ pub mod output;
 pub mod error;
 
 use crate::error::BuildError;
-use rppal::gpio::Gpio;
+pub use rppal;
+use rppal::{gpio::Gpio, i2c::I2c};
+
 
 
 pub struct RpiGpioConfig {
@@ -25,4 +27,9 @@ impl RpiGpio {
             gpio,
         })
     }
+}
+
+
+pub fn get_bus() -> I2c {
+    I2c::new().unwrap()
 }

@@ -3,6 +3,7 @@ pub(crate) mod web_socket;
 
 use crate::server::state::StateCmd;
 use crate::EndpointConfig;
+use axum::Router;
 use static_dir::StaticDirEndpoint;
 use web_socket::WebSocketEndpoint;
 
@@ -22,15 +23,17 @@ impl Endpoint {
                 Endpoint::WebSocket(ws_endpoint)
             },
             EndpointConfig::Static{ directory } => {
-                todo!();
+                let static_endpoint = StaticDirEndpoint::new( directory );
+                Endpoint::Static(static_endpoint)
             }
         }
     }
 
-    pub fn method_router(self) -> MethodRouter {
+    pub fn apply(self, key: &str, router: Router) -> Router {
         match self {
-            Self::WebSocket(endpoint) => endpoint.method_router(),
-            Self::Static(endpoint) => endpoint.method_router(),
+            Self::WebSocket(endpoint) => endpoint.apply(key, router),
+            Self::Static(endpoint) => endpoint.apply(key, router),
         }
     }
+
 }

@@ -5,13 +5,17 @@ edition = "2021"
 
 [features]
 default = [ "server" ]
+all = [ "default", "rpi", "devices" ]
 rpi = [ "dep:ioc_rpi_gpio" ]
+devices = ["dep:ioc_devices" ]
 server = [ "dep:ioc_server" ]
 
 [dependencies]
 ioc_core = { path = "../ioc_core" }
 ioc_rpi_gpio = { path = "../ioc_rpi_gpio", optional = true }
+ioc_devices = { path = "../ioc_devices", features = ["all"], optional = true }
 ioc_server = { path = "../ioc_server", optional = true }
+
 
 tracing.workspace = true
 tracing-subscriber.workspace = true
