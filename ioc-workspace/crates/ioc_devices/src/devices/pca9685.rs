@@ -82,7 +82,8 @@ impl Pca9685PwmOutput {
         let device = device.clone();
         tokio::spawn(async move {
             while let Some(new_value) = rx.recv().await { 
-                let off_time = (new_value.min(1.0).max(0.0) * 4096.0) as u16;
+                // info!("new val: {}", new_value);
+                let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
                 let mut device = match device.lock() {
                     Ok(device) => device,
                     Err(poisoned) => poisoned.into_inner(),   

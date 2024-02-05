@@ -487,6 +487,7 @@ version = "0.0.1"
 dependencies = [
  "ioc_core",
  "ioc_devices",
+ "ioc_extra",
  "ioc_rpi_gpio",
  "ioc_server",
  "tokio",
@@ -512,6 +513,17 @@ dependencies = [
  "ioc_core",
  "lsm303agr",
  "pwm-pca9685",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "ioc_extra"
+version = "0.0.1"
+dependencies = [
+ "futures",
+ "ioc_core",
  "serde",
  "tokio",
  "tracing",

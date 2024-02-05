@@ -39,7 +39,7 @@ impl<T: Clone + Send + 'static> ServerInput<T> {
                     }
                     Err(err) => {
                         warn!("server input {:?} shutting down because {}", key, err);
-                        break;
+                        //break;
                     }
                 }
             }

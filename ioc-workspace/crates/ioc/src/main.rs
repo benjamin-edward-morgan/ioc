@@ -1,3 +1,6 @@
+use ioc_core::channel::Channel;
+use ioc_extra::controller::average::WindowedAverageValueController;
+use ioc_extra::hw::hbridge::HBridgeController;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 // use ioc_core::controller::IdentityController;
@@ -51,14 +54,16 @@ async fn main() {
         .init();
 
     let input_configs = HashMap::from([
-        ("servo0", ServerInputConfig::Float{ start: 0.0, min: 0.00, max: 0.14, step: 0.001 }),
-        ("servo1", ServerInputConfig::Float{ start: 0.0, min: 0.00, max: 0.14, step: 0.001 }),
+        ("pan", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("tilt", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("fr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("lr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 })
     ]);
-
+    
     let output_configs = HashMap::from([]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["servo0", "servo1"],
+        inputs: vec!["pan", "tilt", "fr", "lr"],
         outputs: vec![],
     };
 
@@ -67,7 +72,7 @@ async fn main() {
     };
 
     let cfg = ServerConfig{
-        port: 80,
+        port: 8080,
         root_context: "/",
         inputs: input_configs,
         outputs: output_configs,
@@ -88,10 +93,19 @@ async fn main() {
         i2c_address: 64,
         channels: HashMap::from([
             ("servo0-pwm", 0),
-            ("servo1-pwm", 1)
+            ("servo1-pwm", 1),
+            ("a-enable-pwm", 10),
+            ("a-fwd-pwm", 12),
+            ("a-rev-pwm", 11),
+            ("b-enable-pwm", 13),
+            ("b-fwd-pwm", 14),
+            ("b-rev-pwm", 15),
+            
         ])
     };
     let pwm = Pca9685Device::build(confg, i2c).unwrap();
+
+
 
     // let i2c = ioc_rpi_gpio::get_bus();
     // let confg = Lsm303DeviceConfig{
@@ -100,23 +114,52 @@ async fn main() {
     // let mag_accel = Lsm303Device::build(confg, i2c).unwrap();
 
     match (
-        server.inputs.get("servo0"),
-        server.inputs.get("servo1"),
+        server.inputs.get("pan"),
+        server.inputs.get("tilt"),
+        server.inputs.get("fr"),
+        server.inputs.get("lr"),
         pwm.channels.get("servo0-pwm"),
         pwm.channels.get("servo1-pwm"),
+        pwm.channels.get("a-enable-pwm"),
+        pwm.channels.get("a-fwd-pwm"),
+        pwm.channels.get("a-rev-pwm"),
+        pwm.channels.get("b-enable-pwm"),
+        pwm.channels.get("b-fwd-pwm"),
+        pwm.channels.get("b-rev-pwm"),
     ) {
         (
-            Some(TypedInput::Float(posn0)),
-            Some(TypedInput::Float(posn1)),
+            Some(TypedInput::Float(pan)),
+            Some(TypedInput::Float(tilt)),
+            Some(TypedInput::Float(drive)),
+            Some(TypedInput::Float(steer)),
             Some(pwm0_out),
             Some(pwm1_out),
+            Some(pwm_a_enable),
+            Some(pwm_a_fwd),
+            Some(pwm_a_rev),
+            Some(pwm_b_enable),
+            Some(pwm_b_fwd),
+            Some(pwm_b_rev),
         ) => {
-            let _idc0 = IdentityController::new(posn0, pwm0_out);
-            let _idc1 = IdentityController::new(posn1, pwm1_out);
+            //camera pan/tilt
+            //todo: servo controllers
+
+
+            // let _idc0 = IdentityController::new(pan, pwm0_out);
+            // let _idc1 = IdentityController::new(tilt, pwm1_out);
+
+            //hbridge controllers for steer and drive
+            let drive_chan = Channel::new(0.0);
+            let _drive_debounce = WindowedAverageValueController::new(drive, &drive_chan, 25);
+
+            let steer_chan = Channel::new(0.0);
+            let _steer_debounce = WindowedAverageValueController::new(steer, &steer_chan, 25);
+
+            let _hbr0 = HBridgeController::new(&drive_chan, pwm_a_fwd, pwm_a_rev, pwm_a_enable).await;
+            let _hbr1 = HBridgeController::new(&steer_chan, pwm_b_fwd, pwm_b_rev, pwm_b_enable).await;
+
         },
-        (
-            _, _, _, _ ,
-        ) => {
+        _ => {
             panic!("wrong!");
         }
     }

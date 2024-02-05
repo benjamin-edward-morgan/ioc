@@ -12,6 +12,7 @@ server = [ "dep:ioc_server" ]
 
 [dependencies]
 ioc_core = { path = "../ioc_core" }
+ioc_extra = { path = "../ioc_extra" }
 ioc_rpi_gpio = { path = "../ioc_rpi_gpio", optional = true }
 ioc_devices = { path = "../ioc_devices", features = ["all"], optional = true }
 ioc_server = { path = "../ioc_server", optional = true }
