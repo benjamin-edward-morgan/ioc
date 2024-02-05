@@ -1,0 +1,11 @@
+[package]
+name = "ioc_extra"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+ioc_core = { path = "../ioc_core" }
+tracing.workspace = true
+tokio.workspace = true
+serde.workspace = true
+futures.workspace = true
