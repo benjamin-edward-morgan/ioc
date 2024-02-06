@@ -227,7 +227,7 @@ impl StateSubscriptionKey {
             }
         }
 
-        if outputs.len() > 0 || inputs.len() > 0 {
+        if !outputs.is_empty() || !inputs.is_empty() {
             Some(StateUpdate{
                 inputs, 
                 outputs,
@@ -275,8 +275,8 @@ impl StateSubscriptions {
 
     pub fn subscribe(&mut self, inputs: HashSet<String>, outputs: HashSet<String>) -> broadcast::Receiver<StateUpdate> {
         let subs_key = StateSubscriptionKey{
-            inputs: inputs,
-            outputs: outputs,
+            inputs,
+            outputs,
         };
         match self.subscriptions.get(&subs_key) {
             Some(subs) => subs.rx.resubscribe(),
