@@ -6,8 +6,7 @@ use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, Serve
 use ioc_extra::output::console::ConsoleOutput;
 use std::collections::HashMap;
 
-#[tokio::main]
-async fn main() {
+pub async fn dev_main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -30,9 +29,11 @@ async fn main() {
         outputs: vec![],
     };
 
-    // let static_endpoint_config = EndpointConfig::Static {
-    //     directory: "/home/beef/assets"
-    // };
+    let static_endpoint_config = EndpointConfig::Static {
+        directory: "assets"
+    };
+
+    let mjpeg_config = EndpointConfig::Mjpeg { output: "vid-out" };
 
     let cfg = ServerConfig{
         port: 8080,
@@ -40,8 +41,9 @@ async fn main() {
         inputs: input_configs,
         outputs: output_configs,
         endpoints: HashMap::from([
-            // ("/", static_endpoint_config),
+            ("/", static_endpoint_config),
             ("/ws", ws_endpoint_config),
+            ("/stream", mjpeg_config),
         ]),
         state_channel_size: 100,
     };

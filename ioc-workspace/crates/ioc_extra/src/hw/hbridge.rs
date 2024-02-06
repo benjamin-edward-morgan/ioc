@@ -69,7 +69,6 @@ impl HBridgeController {
                     }
                 }
             }
-            error!("hbridge controller shut down!");
         });
 
         Self{ handle }

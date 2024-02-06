@@ -1,10 +1,10 @@
 
-use std::convert::Infallible;
 
-use axum::{http::{Request, Response, Error}, body::{Body, Bytes}, Router};
 
-use tower::Service;
-use tower_http::services::{ServeDir, ServeFile};
+use axum::{Router};
+
+
+use tower_http::services::{ServeDir};
 
 pub(crate) struct StaticDirEndpoint {
     directory: String,

@@ -50,6 +50,9 @@ pub enum EndpointConfig<'a> {
     Static {
         directory: &'a str,
     },
+    Mjpeg {
+        output: &'a str,
+    }
 }
 
 #[derive(Deserialize)]
