@@ -19,13 +19,15 @@ pub async fn dev_main() {
         ("pan", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("tilt", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("fr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
-        ("lr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 })
+        ("lr", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 2.0/2048.0 }),
+        ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
+        ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
     ]);
     
     let output_configs = HashMap::from([]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["pan", "tilt", "fr", "lr"],
+        inputs: vec!["pan", "tilt", "fr", "lr", "headlights", "taillights"],
         outputs: vec![],
     };
 
