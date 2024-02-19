@@ -23,13 +23,15 @@ pub async fn littlefoot_main() {
         ("pan", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("tilt", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("fr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
-        ("lr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 })
+        ("lr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
+        ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
     ]);
     
     let output_configs = HashMap::from([]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["pan", "tilt", "fr", "lr"],
+        inputs: vec!["pan", "tilt", "fr", "lr", "headlights", "taillights"],
         outputs: vec![],
     };
 
@@ -69,6 +71,8 @@ pub async fn littlefoot_main() {
         channels: HashMap::from([
             ("servo0-pwm", 0),
             ("servo1-pwm", 1),
+            ("headlights-pwm", 4),
+            ("taillights-pwm", 5),
             ("a-enable-pwm", 10),
             ("a-fwd-pwm", 12),
             ("a-rev-pwm", 11),
@@ -93,6 +97,8 @@ pub async fn littlefoot_main() {
         server.inputs.get("tilt"),
         server.inputs.get("fr"),
         server.inputs.get("lr"),
+        server.inputs.get("taillights"),
+        server.inputs.get("headlights"),
         pwm.channels.get("servo0-pwm"),
         pwm.channels.get("servo1-pwm"),
         pwm.channels.get("a-enable-pwm"),
@@ -101,12 +107,16 @@ pub async fn littlefoot_main() {
         pwm.channels.get("b-enable-pwm"),
         pwm.channels.get("b-fwd-pwm"),
         pwm.channels.get("b-rev-pwm"),
+        pwm.channels.get("headlights-pwm"),
+        pwm.channels.get("taillights-pwm"),
     ) {
         (
             Some(TypedInput::Float(pan)),
             Some(TypedInput::Float(tilt)),
             Some(TypedInput::Float(drive)),
             Some(TypedInput::Float(steer)),
+            Some(TypedInput::Float(headlights)),
+            Some(TypedInput::Float(taillights)),
             Some(pwm0_out),
             Some(pwm1_out),
             Some(pwm_a_enable),
@@ -115,6 +125,8 @@ pub async fn littlefoot_main() {
             Some(pwm_b_enable),
             Some(pwm_b_fwd),
             Some(pwm_b_rev),
+            Some(pwm_headlights),
+            Some(pwm_taillights),
         ) => {
           
 
@@ -138,6 +150,10 @@ pub async fn littlefoot_main() {
             let _pan = ServoController::new(&pan_chan, pwm0_out).await;
             let _tilt = ServoController::new(&tilt_chan, pwm1_out).await;
 
+            //headlights, taillights 
+            let _headlight_idc = IdentityController::new(headlights, pwm_headlights);
+            let _taillight_idc = IdentityController::new(taillights, pwm_taillights);
+            
         },
         _ => {
             panic!("wrong!");
