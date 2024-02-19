@@ -132,16 +132,22 @@ impl ServerState {
                             if let Some(current_i) = internal_inputs.get_mut(&k) {
                                 match (update_i, current_i) {
                                     (ServerInputState::Float{ value: updated_float_value, ..}, ServerInputState::Float{ value: current_float_value, min, max, step }) => {
-                                        *current_float_value = updated_float_value;
-                                        inputs.insert(k, ServerInputState::Float{ value: updated_float_value, min: *min, max: *max, step: *step });
+                                        if *current_float_value != updated_float_value {
+                                            *current_float_value = updated_float_value;
+                                            inputs.insert(k, ServerInputState::Float{ value: updated_float_value, min: *min, max: *max, step: *step });
+                                        }
                                     },
                                     (ServerInputState::Bool{ value: updated_bool_value }, ServerInputState::Bool{ value: current_bool_value }) => {
-                                        *current_bool_value = updated_bool_value;
-                                        inputs.insert(k, ServerInputState::Bool{ value: updated_bool_value });
+                                        if *current_bool_value != updated_bool_value {
+                                            *current_bool_value = updated_bool_value;
+                                            inputs.insert(k, ServerInputState::Bool{ value: updated_bool_value });
+                                        }
                                     },
                                     (ServerInputState::String{ value: updated_string_value, ..}, ServerInputState::String{ value: current_string_value, max_length }) => {
-                                        *current_string_value = updated_string_value.to_string();
-                                        inputs.insert(k, ServerInputState::String{ value: updated_string_value, max_length: *max_length });
+                                        if *current_string_value != updated_string_value {
+                                            *current_string_value = updated_string_value.to_string();
+                                            inputs.insert(k, ServerInputState::String{ value: updated_string_value, max_length: *max_length });
+                                        }
                                     },
                                     (_, _) => panic!("nope!"),
                                 }

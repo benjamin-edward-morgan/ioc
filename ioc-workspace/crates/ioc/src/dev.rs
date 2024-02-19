@@ -3,7 +3,7 @@ use tracing::{error,info};
 
 use ioc_core::controller::IdentityController;
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
-use ioc_extra::output::console::ConsoleOutput;
+use ioc_extra::output::{console::ConsoleOutput, childproc::ChildProcessInput};
 use std::collections::HashMap;
 
 pub async fn dev_main() {
@@ -33,7 +33,11 @@ pub async fn dev_main() {
         directory: "assets"
     };
 
-    let mjpeg_config = EndpointConfig::Mjpeg { output: "vid-out" };
+    println!("build input");
+    let mjpeg_in = ChildProcessInput::new();
+
+    println!("build output");
+    let mjpeg_config = EndpointConfig::Mjpeg { frames: mjpeg_in.rx };
 
     let cfg = ServerConfig{
         port: 8080,
@@ -45,38 +49,39 @@ pub async fn dev_main() {
             ("/ws", ws_endpoint_config),
             ("/stream", mjpeg_config),
         ]),
-        state_channel_size: 100,
+        state_channel_size: 5,
+        io_channel_size: 5,
     };
        
     let server = Server::try_build(cfg).await.unwrap();
+    println!("built server state!");
+    // match (
+    //     server.inputs.get("pan"),
+    //     server.inputs.get("tilt"),
+    //     server.inputs.get("fr"),
+    //     server.inputs.get("lr"),
+    // ) {
+    //     (
+    //         Some(TypedInput::Float(pan)),
+    //         Some(TypedInput::Float(tilt)),
+    //         Some(TypedInput::Float(fr)),
+    //         Some(TypedInput::Float(lr)),
+    //     ) => {
+    //         let pan_out = ConsoleOutput::new("pan");
+    //         let tilt_out = ConsoleOutput::new("tilt");
+    //         let fr_out = ConsoleOutput::new("fr");
+    //         let lr_out = ConsoleOutput::new("lr");
 
-    match (
-        server.inputs.get("pan"),
-        server.inputs.get("tilt"),
-        server.inputs.get("fr"),
-        server.inputs.get("lr"),
-    ) {
-        (
-            Some(TypedInput::Float(pan)),
-            Some(TypedInput::Float(tilt)),
-            Some(TypedInput::Float(fr)),
-            Some(TypedInput::Float(lr)),
-        ) => {
-            let pan_out = ConsoleOutput::new("pan");
-            let tilt_out = ConsoleOutput::new("tilt");
-            let fr_out = ConsoleOutput::new("fr");
-            let lr_out = ConsoleOutput::new("lr");
 
-
-            let _idc0 = IdentityController::new(pan, &pan_out);
-            let _idc1 = IdentityController::new(tilt, &tilt_out);
-            let _idc2 = IdentityController::new(fr, &fr_out);
-            let _idc3 = IdentityController::new(lr, &lr_out);  
-        },
-        _ => {
-            panic!("wrong!");
-        }
-    }
+    //         let _idc0 = IdentityController::new(pan, &pan_out);
+    //         let _idc1 = IdentityController::new(tilt, &tilt_out);
+    //         let _idc2 = IdentityController::new(fr, &fr_out);
+    //         let _idc3 = IdentityController::new(lr, &lr_out);  
+    //     },
+    //     x => {
+    //         panic!("wrong!\n{:?}", x);
+    //     }
+    // }
 
 
     info!("started up!");
