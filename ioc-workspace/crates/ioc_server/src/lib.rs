@@ -2,6 +2,7 @@ pub mod error;
 pub(crate) mod server;
 
 use std::collections::HashMap;
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -41,7 +42,6 @@ pub enum ServerOutputConfig {
     String,
 }
 
-#[derive(Deserialize)]
 pub enum EndpointConfig<'a> {
     WebSocket {
         inputs: Vec<&'a str>,
@@ -51,11 +51,10 @@ pub enum EndpointConfig<'a> {
         directory: &'a str,
     },
     Mjpeg {
-        output: &'a str,
+        frames: watch::Receiver<Vec<u8>>,
     }
 }
 
-#[derive(Deserialize)]
 pub struct ServerConfig<'a> {
     pub port: u16,
     pub root_context: &'a str,
@@ -63,8 +62,10 @@ pub struct ServerConfig<'a> {
     pub outputs: HashMap<&'a str, ServerOutputConfig>,
     pub endpoints: HashMap<&'a str, EndpointConfig<'a>>,
     pub state_channel_size: usize,
+    pub io_channel_size: usize,
 }
 
+#[derive(Debug)]
 pub enum TypedInput {
     Float(ServerInput<f64>),
     Bool(ServerInput<bool>),
@@ -91,29 +92,34 @@ impl<'a> Server<'a> {
         let state = ServerState::try_build(cfg.state_channel_size, &cfg.inputs, &cfg.outputs)?;
         let cmd_tx = state.cmd_tx;
 
+        println!("server inputs, outputs ...");
         //create the inputs and outputs
         let mut inputs = HashMap::with_capacity(cfg.inputs.len());
         let mut outputs = HashMap::with_capacity(cfg.outputs.len());
+        println!("server io builder ...");
+
         let io_builder = ServerIoBuilder {
             cmd_tx: cmd_tx.clone(),
-            channel_size: 100,
+            channel_size: cfg.io_channel_size,
         };
+        println!("server inputs ...");
         for (key, input_config) in cfg.inputs {
             let srv_input = io_builder.try_build_input(key, input_config).await?;
             inputs.insert(key, srv_input);
         }
+        println!("server outputs ...");
         for (key, output_config) in cfg.outputs {
             let srv_output = io_builder.try_build_output(key, output_config).await?;
             outputs.insert(key, srv_output);
         }
 
         //build router service from endpoint configs
+        println!("building routers!");
         let mut router_service = axum::routing::Router::new();
         for (key, ep_config) in cfg.endpoints {
+            println!("building router {} ...", key);
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
             router_service = endpoint.apply(key, router_service);
-            //router_service = router_service.route(key, endpoint.method_router());
-            //router_service.route_service(key, endpoint.service());
         }
         router_service = router_service.layer(
             TraceLayer::new_for_http()

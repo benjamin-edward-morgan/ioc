@@ -1,6 +1,7 @@
 use ioc_core::channel::Channel;
 use ioc_extra::controller::average::WindowedAverageValueController;
-use ioc_extra::hw::hbridge::HBridgeController;
+use ioc_extra::hw::{servo::ServoController, hbridge::HBridgeController};
+use ioc_extra::output::childproc::ChildProcessInput;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 use ioc_core::controller::IdentityController;
@@ -36,6 +37,13 @@ pub async fn littlefoot_main() {
         directory: "/home/beef/assets"
     };
 
+    println!("build input");
+    let mjpeg_in = ChildProcessInput::new();
+
+    println!("build output");
+    let mjpeg_config = EndpointConfig::Mjpeg { frames: mjpeg_in.rx };
+
+
     let cfg = ServerConfig{
         port: 8080,
         root_context: "/",
@@ -44,8 +52,10 @@ pub async fn littlefoot_main() {
         endpoints: HashMap::from([
             ("/", static_endpoint_config),
             ("/ws", ws_endpoint_config),
+            ("/stream", mjpeg_config),
         ]),
-        state_channel_size: 100,
+        state_channel_size: 5,
+        io_channel_size: 5,
     };
        
     let server = Server::try_build(cfg).await.unwrap();
@@ -106,12 +116,7 @@ pub async fn littlefoot_main() {
             Some(pwm_b_fwd),
             Some(pwm_b_rev),
         ) => {
-            //camera pan/tilt
-            //todo: servo controllers
-
-
-            // let _idc0 = IdentityController::new(pan, pwm0_out);
-            // let _idc1 = IdentityController::new(tilt, pwm1_out);
+          
 
             //hbridge controllers for steer and drive
             let drive_chan = Channel::new(0.0);
@@ -122,6 +127,16 @@ pub async fn littlefoot_main() {
 
             let _hbr0 = HBridgeController::new(&drive_chan, pwm_a_fwd, pwm_a_rev, pwm_a_enable).await;
             let _hbr1 = HBridgeController::new(&steer_chan, pwm_b_fwd, pwm_b_rev, pwm_b_enable).await;
+
+            //servo controllers for pan and tilt
+            let pan_chan = Channel::new(0.0);
+            let _pan_debounce = WindowedAverageValueController::new(pan, &pan_chan, 25);
+
+            let tilt_chan = Channel::new(0.0);
+            let _lilt_debounce = WindowedAverageValueController::new(tilt, &tilt_chan, 25);
+
+            let _pan = ServoController::new(&pan_chan, pwm0_out).await;
+            let _tilt = ServoController::new(&tilt_chan, pwm1_out).await;
 
         },
         _ => {

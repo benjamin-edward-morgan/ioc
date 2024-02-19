@@ -7,6 +7,7 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::log::{error, warn};
 
+#[derive(Debug)]
 pub struct ServerInput<T: Clone + Send + 'static> {
     pub handle: JoinHandle<()>,
     value: Arc<Mutex<T>>,
@@ -30,7 +31,7 @@ impl<T: Clone + Send + 'static> ServerInput<T> {
                         if let Some(new_value) = update.inputs.get(&key) {
                             if let Some(transformed) = transform(new_value) {
                                 if let Err(_err) = tx.send(transformed) {
-                                    error!("server inbput {:?} shutting down because of error sending updated broadcast value", key);
+                                    error!("server input {:?} shutting down because of error sending updated broadcast value", key);
                                     break;
                                 }
                             }
@@ -38,7 +39,7 @@ impl<T: Clone + Send + 'static> ServerInput<T> {
                         }
                     }
                     Err(err) => {
-                        warn!("server input {:?} shutting down because {}", key, err);
+                        warn!("server input {:?} got {}", key, err);
                         //break;
                     }
                 }
