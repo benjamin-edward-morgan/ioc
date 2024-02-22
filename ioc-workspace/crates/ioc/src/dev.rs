@@ -1,9 +1,9 @@
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 
-use ioc_core::controller::IdentityController;
+use ioc_core::{controller::IdentityController, input::SumInput};
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
-use ioc_extra::output::{console::ConsoleOutput, childproc::ChildProcessInput};
+use ioc_extra::{hw::hbridge::HBridgeController, output::childproc::ChildProcessInput};
 use std::collections::HashMap;
 
 pub async fn dev_main() {
@@ -18,17 +18,33 @@ pub async fn dev_main() {
     let input_configs = HashMap::from([
         ("pan", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("tilt", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
-        ("fr", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
-        ("lr", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 2.0/2048.0 }),
+        ("pan_trim", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("tilt_trim", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("drive", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
+        ("steer", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
         ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
     ]);
     
-    let output_configs = HashMap::from([]);
+    let output_configs = HashMap::from([
+        ("pan_out", ServerOutputConfig::Float),
+        ("tilt_out", ServerOutputConfig::Float),
+        ("drive_fwd_out", ServerOutputConfig::Float),
+        ("drive_rev_out", ServerOutputConfig::Float),
+        ("drive_enable_out", ServerOutputConfig::Float),
+        ("steer_left_out", ServerOutputConfig::Float),
+        ("steer_right_out", ServerOutputConfig::Float),
+        ("steer_enable_out", ServerOutputConfig::Float),
+    ]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["pan", "tilt", "fr", "lr", "headlights", "taillights"],
+        inputs: vec!["pan", "tilt", "pan_trim", "tilt_trim", "drive", "steer", "headlights", "taillights"],
         outputs: vec![],
+    };
+
+    let debug_ws_endpoint_config = EndpointConfig::WebSocket { 
+        inputs: vec![], 
+        outputs: vec!["pan_out", "tilt_out", "drive_fwd_out", "drive_rev_out", "drive_enable_out", "steer_left_out", "steer_right_out", "steer_enable_out"] 
     };
 
     let static_endpoint_config = EndpointConfig::Static {
@@ -49,6 +65,7 @@ pub async fn dev_main() {
         endpoints: HashMap::from([
             ("/", static_endpoint_config),
             ("/ws", ws_endpoint_config),
+            ("/debug", debug_ws_endpoint_config),
             ("/stream", mjpeg_config),
         ]),
         state_channel_size: 5,
@@ -57,33 +74,61 @@ pub async fn dev_main() {
        
     let server = Server::try_build(cfg).await.unwrap();
     println!("built server state!");
-    // match (
-    //     server.inputs.get("pan"),
-    //     server.inputs.get("tilt"),
-    //     server.inputs.get("fr"),
-    //     server.inputs.get("lr"),
-    // ) {
-    //     (
-    //         Some(TypedInput::Float(pan)),
-    //         Some(TypedInput::Float(tilt)),
-    //         Some(TypedInput::Float(fr)),
-    //         Some(TypedInput::Float(lr)),
-    //     ) => {
-    //         let pan_out = ConsoleOutput::new("pan");
-    //         let tilt_out = ConsoleOutput::new("tilt");
-    //         let fr_out = ConsoleOutput::new("fr");
-    //         let lr_out = ConsoleOutput::new("lr");
 
+    match (
+        server.inputs.get("pan"),
+        server.inputs.get("tilt"),
+        server.inputs.get("pan_trim"),
+        server.inputs.get("tilt_trim"),
+        server.outputs.get("pan_out"),
+        server.outputs.get("tilt_out"),
+    ) {
+        (
+            Some(TypedInput::Float(pan)),
+            Some(TypedInput::Float(tilt)),
+            Some(TypedInput::Float(pan_trim)),
+            Some(TypedInput::Float(tilt_trim)),
+            Some(TypedOutput::Float(pan_out)),
+            Some(TypedOutput::Float(tilt_out)),   
+        ) => {
+            let pan_sum = SumInput::new(20, vec![pan, pan_trim]);
+            let tilt_sum = SumInput::new(20, vec![tilt, tilt_trim]);
 
-    //         let _idc0 = IdentityController::new(pan, &pan_out);
-    //         let _idc1 = IdentityController::new(tilt, &tilt_out);
-    //         let _idc2 = IdentityController::new(fr, &fr_out);
-    //         let _idc3 = IdentityController::new(lr, &lr_out);  
-    //     },
-    //     x => {
-    //         panic!("wrong!\n{:?}", x);
-    //     }
-    // }
+            let _idc2 = IdentityController::new(&pan_sum, pan_out);
+            let _idc3 = IdentityController::new(&tilt_sum, tilt_out);  
+        },
+        _x => {
+            panic!("wrong! failed to build camera pan/tilt system!");
+        }
+    }
+
+    match (
+        server.inputs.get("drive"),
+        server.inputs.get("steer"),
+        server.outputs.get("drive_fwd_out"), 
+        server.outputs.get("drive_rev_out"), 
+        server.outputs.get("drive_enable_out"), 
+        server.outputs.get("steer_left_out"), 
+        server.outputs.get("steer_right_out"), 
+        server.outputs.get("steer_enable_out"),
+    ) {
+        (
+            Some(TypedInput::Float(drive)),
+            Some(TypedInput::Float(steer)),
+            Some(TypedOutput::Float(drive_fwd_out)),
+            Some(TypedOutput::Float(drive_rev_out)),
+            Some(TypedOutput::Float(drive_enable_out)),
+            Some(TypedOutput::Float(steer_left_out)),
+            Some(TypedOutput::Float(steer_right_out)),
+            Some(TypedOutput::Float(steer_enable_out)),
+        ) => {
+            let _drive_hbridge = HBridgeController::new(drive, drive_fwd_out, drive_rev_out, drive_enable_out);
+            let _steer_hbridge = HBridgeController::new(steer, steer_left_out, steer_right_out, steer_enable_out);     
+        },
+        _ => {
+            panic!("wrong! failed to build steering/driving system!")
+        },
+    }
 
 
     info!("started up!");
