@@ -3,7 +3,7 @@ use axum::extract::ws::{WebSocket, Message};
 use futures::{StreamExt,SinkExt};
 use tokio::task::JoinHandle;
 use tokio::sync::mpsc;
-use tracing::{warn,info};
+use tracing::{debug, warn,info};
 use std::collections::HashMap;
 
 use crate::server::state::{Subscription,StateCmd};
@@ -30,7 +30,7 @@ impl WebSocketConnection {
         let json = serde_json::to_string(&initial_message).unwrap();
         match ws_tx.send(Message::Text(json)).await {
             Ok(_) => {
-                info!("sent intial ws message! starting send task ... ");
+                debug!("sent intial ws message. starting send task ... ");
                 let send_task = tokio::spawn(async move {
                     while let Ok(update) = update_rx.recv().await {
                         let update_msg: WsUpdateMessage = update.into();
@@ -54,13 +54,16 @@ impl WebSocketConnection {
                                     }
                                 }
                             },
+                            Message::Close(frame_opt) => {
+                                debug!("closing websocket because we recieved close frame: {:?}", frame_opt);
+                            },
                             message => {
                                 warn!("unexpected message type! {:?}", message)
                             }
                         }
                     }
                     send_task.abort();
-                    info!("websocket is closing!");
+                    debug!("websocket is closing");
                 });
         
                 WebSocketConnection{
@@ -70,10 +73,6 @@ impl WebSocketConnection {
             Err(err) => {
                 panic!("error sending initial ws message! {}", err);
             }
-        }
-
-
-        
-        
+        } 
     }
 }

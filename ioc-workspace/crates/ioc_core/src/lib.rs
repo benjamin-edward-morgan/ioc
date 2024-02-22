@@ -2,6 +2,7 @@ use tokio::sync::{broadcast, mpsc};
 
 pub mod channel;
 pub mod controller;
+pub mod input;
 
 pub struct InputSource<T> {
     pub start: T,

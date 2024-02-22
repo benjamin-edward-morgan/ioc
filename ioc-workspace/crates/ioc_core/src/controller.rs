@@ -1,8 +1,7 @@
 
 use crate::{Input, Output};
-use tracing::error;
+use tracing::{info,error};
 use tokio::task::JoinHandle;
-
 pub struct IdentityController {
     pub handle: JoinHandle<()>,
 }
@@ -32,10 +31,11 @@ impl IdentityController {
                     },
                     Err(err) => {
                         error!("IdentityController error receiving from source: {}", err);
-                        break;
+                        // break;
                     }
                 }
             }
+            info!("Identity controller shutting down!")
         });
 
         IdentityController{

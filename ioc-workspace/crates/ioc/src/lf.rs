@@ -137,8 +137,8 @@ pub async fn littlefoot_main() {
             let steer_chan = Channel::new(0.0);
             let _steer_debounce = WindowedAverageValueController::new(steer, &steer_chan, 25);
 
-            let _hbr0 = HBridgeController::new(&drive_chan, pwm_a_fwd, pwm_a_rev, pwm_a_enable).await;
-            let _hbr1 = HBridgeController::new(&steer_chan, pwm_b_fwd, pwm_b_rev, pwm_b_enable).await;
+            let _hbr0 = HBridgeController::new(&drive_chan, pwm_a_fwd, pwm_a_rev, pwm_a_enable);
+            let _hbr1 = HBridgeController::new(&steer_chan, pwm_b_fwd, pwm_b_rev, pwm_b_enable);
 
             //servo controllers for pan and tilt
             let pan_chan = Channel::new(0.0);

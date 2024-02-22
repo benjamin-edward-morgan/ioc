@@ -4,7 +4,7 @@ use super::connection::WebSocketConnection;
 
 use tokio::sync::{mpsc, oneshot};
 use axum::extract::ws::WebSocket;
-use tracing::{info, error};
+use tracing::{debug, info, error};
 use std::collections::HashSet;
 
 pub(crate) struct WebSocketManager {
@@ -14,14 +14,14 @@ pub(crate) struct WebSocketManager {
 impl WebSocketManager {
     pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: Vec<&str>, outputs: Vec<&str>) -> Self {
 
-        let inputs: HashSet<String> = inputs.iter().map(|s| s.to_string()).collect();
-        let outputs: HashSet<String> = outputs.iter().map(|s| s.to_string()).collect();
+        let inputs: HashSet<String> = inputs.into_iter().map(|s| s.to_string()).collect();
+        let outputs: HashSet<String> = outputs.into_iter().map(|s| s.to_string()).collect();
         let (websocket_tx, mut websocket_rx) = mpsc::channel(10);
 
         let task_state_cmd_tx = cmd_tx.clone();
         tokio::spawn(async move {
             while let Some(websocket) = websocket_rx.recv().await {
-                info!("new websocket!");
+                debug!("conneting new websocket");
 
                 //get a state subscription 
                 let (callback_tx, callback_rx) = oneshot::channel();
@@ -47,16 +47,12 @@ impl WebSocketManager {
                 };
 
                 if let Some(subscription) = subs_option {
-                    info!("got a subscription!");
-
                     let _connection = WebSocketConnection::new(
                         &task_state_cmd_tx,
                         websocket,
                         subscription
                     ).await;
-
                 }
-
             }
             info!("websocket manager is done!");
         });

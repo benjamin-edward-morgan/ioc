@@ -87,14 +87,14 @@ impl ServerState {
     ) -> Result<Self, ServerBuildError> {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(channel_size);
 
-        let mut internal_inputs = HashMap::with_capacity(inputs.len());
+        let mut internal_inputs: HashMap<String, ServerInputState> = HashMap::with_capacity(inputs.len());
         let mut input_states: HashMap<String,ServerInputState> = HashMap::with_capacity(inputs.len());
         for (key, input) in inputs {
             internal_inputs.insert(key.to_string(), input.into());
             input_states.insert(key.to_string(), input.into());
         }
         
-        let mut internal_outputs = HashMap::with_capacity(inputs.len());
+        let mut internal_outputs: HashMap<String, ServerOutputState> = HashMap::with_capacity(inputs.len());
         let mut output_states: HashMap<String,ServerOutputState> = HashMap::with_capacity(outputs.len());
         for (key, output) in outputs {
             internal_outputs.insert(key.to_string(), output.into());
@@ -108,13 +108,28 @@ impl ServerState {
                 match cmd {
                     StateCmd::Subscribe{ callback, inputs, outputs } => {
 
-                        let subs_rx = state_subs.subscribe(inputs, outputs); 
+                        let subs_rx = state_subs.subscribe(inputs.clone(), outputs.clone()); 
+
+                        let mut filtered_inputs: HashMap<String, ServerInputState> = HashMap::with_capacity(inputs.len());
+                        let mut filtered_outputs: HashMap<String, ServerOutputState> = HashMap::with_capacity(outputs.len());
+
+                        for k in inputs {
+                            if let Some(i) = internal_inputs.get(&k) {
+                                filtered_inputs.insert(k, i.clone());
+                            }
+                        }
+
+                        for k in outputs {
+                            if let Some(o) = internal_outputs.get(&k) {
+                                filtered_outputs.insert(k, o.clone());
+                            }
+                        }
 
                         //TODO: filter intial inputs and outputs
                         let subs = Subscription {
                             start: StateUpdate{
-                                inputs: internal_inputs.clone(),
-                                outputs: internal_outputs.clone(),
+                                inputs: filtered_inputs,
+                                outputs: filtered_outputs,
                             },
                             update_rx: subs_rx,
                         };
@@ -125,8 +140,8 @@ impl ServerState {
                     },
                     StateCmd::Update(update) => { 
 
-                        let mut inputs = HashMap::with_capacity(update.inputs.len());
-                        let mut outputs = HashMap::with_capacity(update.inputs.len());
+                        let mut inputs: HashMap<String, ServerInputState> = HashMap::with_capacity(update.inputs.len());
+                        let mut outputs: HashMap<String, ServerOutputState> = HashMap::with_capacity(update.inputs.len());
 
                         for (k, update_i) in update.inputs {
                             if let Some(current_i) = internal_inputs.get_mut(&k) {

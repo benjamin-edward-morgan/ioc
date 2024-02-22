@@ -1,13 +1,16 @@
 
-use ioc_core::{Input,InputSource};
-use tokio::task::JoinHandle;
 use tokio::sync::watch;
 use std::process::{Command, Stdio, ChildStdout};
 use std::io::Read;
 
 pub struct ChildProcessInput {
-    handle: std::thread::JoinHandle<()>,
     pub rx: watch::Receiver<Vec<u8>>,
+}
+
+impl Default for ChildProcessInput {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChildProcessInput {
@@ -16,7 +19,7 @@ impl ChildProcessInput {
         let (tx, rx) = watch::channel(Vec::new());
 
         println!("spawing child waiter!");
-        let handle = std::thread::spawn(move || {
+        std::thread::spawn(move || {
 
             let mut child = Command::new("libcamera-vid")
                 .args([
@@ -49,22 +52,12 @@ impl ChildProcessInput {
 
         println!("returning child proc!");
         Self {
-            handle,
             rx,
         }
 
     }
 }
 
-
-// impl Input<Vec<u8>> for ChildProcessInput {
-//     fn source(&self) -> InputSource<Vec<u8>> {
-//         InputSource { 
-//             start: Vec::new(), 
-//             rx: self.rx.clone(),
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 enum JpegChopperState {
@@ -117,7 +110,7 @@ fn chop_jpegs(mut stream: ChildStdout, tx: watch::Sender<Vec<u8>>) {
 
                                     tx.send(frame.clone()).unwrap();
                                     frame.clear();
-                                } else if b >= 0xD0 && b < 0xD7 {
+                                } else if (0xD0..0xD7).contains(&b) {
                                     //reset marker - no size
                                     state = JpegChopperState::Marker1;
                                     frame.push(b);
@@ -141,7 +134,7 @@ fn chop_jpegs(mut stream: ChildStdout, tx: watch::Sender<Vec<u8>>) {
 
                             JpegChopperState::Size2(first_byte) => {
                                 //remaining bytes minus two for payload size
-                                state = JpegChopperState::Payload((first_byte as u16) << 8 | (b as u16) - 2);
+                                state = JpegChopperState::Payload(((first_byte as u16) << 8 | (b as u16)) - 2);
                                 frame.push(b);
                                 i += 1;
                             }
