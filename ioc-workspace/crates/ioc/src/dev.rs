@@ -1,9 +1,10 @@
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 
-use ioc_core::{controller::IdentityController, input::SumInput};
+use ioc_core::{controller::IdentityController, input::SumInput, channel::Channel};
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
 use ioc_extra::{hw::hbridge::HBridgeController, output::childproc::ChildProcessInput};
+use ioc_extra::controller::average::WindowedAverageValueController;
 use std::collections::HashMap;
 
 pub async fn dev_main() {
@@ -35,16 +36,28 @@ pub async fn dev_main() {
         ("steer_left_out", ServerOutputConfig::Float),
         ("steer_right_out", ServerOutputConfig::Float),
         ("steer_enable_out", ServerOutputConfig::Float),
+        ("headlights_out", ServerOutputConfig::Float),
+        ("taillights_out", ServerOutputConfig::Float),  
     ]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["pan", "tilt", "pan_trim", "tilt_trim", "drive", "steer", "headlights", "taillights"],
+        inputs: vec![
+            "pan", "tilt", 
+            "pan_trim", "tilt_trim", 
+            "drive", "steer", 
+            "headlights", "taillights"
+        ],
         outputs: vec![],
     };
 
     let debug_ws_endpoint_config = EndpointConfig::WebSocket { 
         inputs: vec![], 
-        outputs: vec!["pan_out", "tilt_out", "drive_fwd_out", "drive_rev_out", "drive_enable_out", "steer_left_out", "steer_right_out", "steer_enable_out"] 
+        outputs: vec![
+            "pan_out", "tilt_out", 
+            "drive_fwd_out", "drive_rev_out", "drive_enable_out", 
+            "steer_left_out", "steer_right_out", "steer_enable_out",
+            "headlights_out", "taillights_out"
+        ] 
     };
 
     let static_endpoint_config = EndpointConfig::Static {
@@ -92,10 +105,16 @@ pub async fn dev_main() {
             Some(TypedOutput::Float(tilt_out)),   
         ) => {
             let pan_sum = SumInput::new(20, vec![pan, pan_trim]);
-            let tilt_sum = SumInput::new(20, vec![tilt, tilt_trim]);
+            let pan_chan = Channel::new(0.0);
+            let _pan_windows = WindowedAverageValueController::new(&pan_sum, &pan_chan, 25);
 
-            let _idc2 = IdentityController::new(&pan_sum, pan_out);
-            let _idc3 = IdentityController::new(&tilt_sum, tilt_out);  
+
+            let tilt_sum = SumInput::new(20, vec![tilt, tilt_trim]);
+            let tilt_chan = Channel::new(0.0);
+            let _tilt_windows = WindowedAverageValueController::new(&tilt_sum, &tilt_chan, 25);
+
+            let _idc2 = IdentityController::new(&pan_chan, pan_out);
+            let _idc3 = IdentityController::new(&tilt_chan, tilt_out);  
         },
         _x => {
             panic!("wrong! failed to build camera pan/tilt system!");
@@ -122,12 +141,47 @@ pub async fn dev_main() {
             Some(TypedOutput::Float(steer_right_out)),
             Some(TypedOutput::Float(steer_enable_out)),
         ) => {
-            let _drive_hbridge = HBridgeController::new(drive, drive_fwd_out, drive_rev_out, drive_enable_out);
-            let _steer_hbridge = HBridgeController::new(steer, steer_left_out, steer_right_out, steer_enable_out);     
+
+            let drive_chan = Channel::new(0.0);
+            let _drive_windows = WindowedAverageValueController::new(drive, &drive_chan, 25);
+
+            let steer_chan = Channel::new(0.0);
+            let _steer_windows = WindowedAverageValueController::new(steer, &steer_chan, 25);
+
+
+            let _drive_hbridge = HBridgeController::new(&drive_chan, drive_fwd_out, drive_rev_out, drive_enable_out);
+            let _steer_hbridge = HBridgeController::new(&steer_chan, steer_left_out, steer_right_out, steer_enable_out);     
         },
         _ => {
             panic!("wrong! failed to build steering/driving system!")
         },
+    }
+
+    match (
+        server.inputs.get("headlights"),
+        server.inputs.get("taillights"),
+        server.outputs.get("headlights_out"),
+        server.outputs.get("taillights_out"),
+    ) {
+        (
+            Some(TypedInput::Float(headlights)),
+            Some(TypedInput::Float(taillights)),
+            Some(TypedOutput::Float(headlights_out)),
+            Some(TypedOutput::Float(taillights_out)),
+
+        ) => {
+            let headl_chan = Channel::new(0.0);
+            let _headl_debounce = WindowedAverageValueController::new(headlights, &headl_chan, 25);
+
+            let taill_chan = Channel::new(0.0);
+            let _taill_debounce = WindowedAverageValueController::new(taillights, &taill_chan, 25);
+
+            let _hl_idc = IdentityController::new(&headl_chan, headlights_out);
+            let _tl_idc = IdentityController::new(&taill_chan, taillights_out);
+        },
+        _ => {
+            panic!("wrong! failed to build lights system!");
+        }
     }
 
 
