@@ -3,6 +3,7 @@ use ioc_core::input::SumInput;
 use ioc_extra::controller::average::WindowedAverageValueController;
 use ioc_extra::hw::{servo::ServoController, hbridge::HBridgeController};
 use ioc_extra::output::childproc::ChildProcessInput;
+use ioc_extra::hw::camera::Camera;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 use ioc_core::controller::IdentityController;
@@ -29,12 +30,18 @@ pub async fn littlefoot_main() {
         ("steer", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
         ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
+        ("enable_camera", ServerInputConfig::Bool { start: true }),
     ]);
     
     let output_configs = HashMap::from([]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
-        inputs: vec!["pan", "tilt", "pan_trim", "tilt_trim", "drive", "steer", "headlights", "taillights"],
+        inputs: vec![
+            "pan", "tilt", "pan_trim", "tilt_trim",
+             "drive", "steer", 
+             "headlights", "taillights",
+             "enable_camera" 
+        ],
         outputs: vec![],
     };
 
@@ -42,12 +49,13 @@ pub async fn littlefoot_main() {
         directory: "/home/beef/assets"
     };
 
-    println!("build input");
-    let mjpeg_in = ChildProcessInput::new();
-
-    println!("build output");
-    let mjpeg_config = EndpointConfig::Mjpeg { frames: mjpeg_in.rx };
-
+    info!("building camera mjpeg stream...");
+    // let mjpeg_in = ChildProcessInput::new();
+    let cam_enable_chan = Channel::new(true);
+    let cam = Camera::new(&cam_enable_chan);
+    
+    info!("building camera mjpeg endpoint...");
+    let mjpeg_config = EndpointConfig::Mjpeg { frames: cam.mjpeg };
 
     let cfg = ServerConfig{
         port: 8080,
@@ -182,6 +190,17 @@ pub async fn littlefoot_main() {
         },
         _ => {
             panic!("wrong! failed to build lights system");
+        }
+    }
+
+    match (
+        server.inputs.get("enable_camera"),
+    ) {
+        (Some(TypedInput::Bool(enable_camera)),) => {
+            let _ = IdentityController::new(enable_camera, &cam_enable_chan);
+        },
+        _ => {
+            panic!("wrong! unable to build camera controls!");
         }
     }
 
