@@ -86,38 +86,38 @@ pub struct Server<'a> {
 
 impl<'a> Server<'a> {
     pub async fn try_build(cfg: ServerConfig<'a>) -> Result<Self, ServerBuildError> {
-        info!("building server state!");
+        info!("building server state ...");
 
         //global state
         let state = ServerState::try_build(cfg.state_channel_size, &cfg.inputs, &cfg.outputs)?;
         let cmd_tx = state.cmd_tx;
 
-        println!("server inputs, outputs ...");
+        info!("building server inputs, outputs ...");
         //create the inputs and outputs
         let mut inputs = HashMap::with_capacity(cfg.inputs.len());
         let mut outputs = HashMap::with_capacity(cfg.outputs.len());
-        println!("server io builder ...");
+        info!("building server io builder ...");
 
         let io_builder = ServerIoBuilder {
             cmd_tx: cmd_tx.clone(),
             channel_size: cfg.io_channel_size,
         };
-        println!("server inputs ...");
+        info!("building server inputs ...");
         for (key, input_config) in cfg.inputs {
             let srv_input = io_builder.try_build_input(key, input_config).await?;
             inputs.insert(key, srv_input);
         }
-        println!("server outputs ...");
+        info!("building server outputs ...");
         for (key, output_config) in cfg.outputs {
             let srv_output = io_builder.try_build_output(key, output_config).await?;
             outputs.insert(key, srv_output);
         }
 
         //build router service from endpoint configs
-        println!("building routers!");
+       info!("building routers ...");
         let mut router_service = axum::routing::Router::new();
         for (key, ep_config) in cfg.endpoints {
-            println!("building router {} ...", key);
+            info!("building router {} ...", key);
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
             router_service = endpoint.apply(key, router_service);
         }

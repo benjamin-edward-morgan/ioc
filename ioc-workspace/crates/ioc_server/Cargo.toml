@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ioc_core = { path = "../ioc_core" }
 
+tokio-stream = { version = "0.1.14", features = ["sync"] }
 axum = { version = "0.6.20", features = ["ws", "headers"] }
 axum-extra = { version = "0.8.0" }
 tower = { version = "0.4", features = ["util"] }

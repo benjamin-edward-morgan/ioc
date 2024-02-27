@@ -1,3 +1,4 @@
+use ioc_extra::hw::camera::Camera;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
 
@@ -25,6 +26,7 @@ pub async fn dev_main() {
         ("steer", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
         ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
+        ("enable_camera", ServerInputConfig::Bool { start: true })
     ]);
     
     let output_configs = HashMap::from([
@@ -45,7 +47,8 @@ pub async fn dev_main() {
             "pan", "tilt", 
             "pan_trim", "tilt_trim", 
             "drive", "steer", 
-            "headlights", "taillights"
+            "headlights", "taillights",
+            "enable_camera",
         ],
         outputs: vec![],
     };
@@ -64,11 +67,14 @@ pub async fn dev_main() {
         directory: "assets"
     };
 
-    println!("build input");
-    let mjpeg_in = ChildProcessInput::new();
+    info!("building camera mjpeg stream...");
+    // let mjpeg_in = ChildProcessInput::new();
+    let cam_enable_chan = Channel::new(true);
+    let cam = Camera::new(&cam_enable_chan);
+    
 
-    println!("build output");
-    let mjpeg_config = EndpointConfig::Mjpeg { frames: mjpeg_in.rx };
+    info!("building camera mjpeg endpoint...");
+    let mjpeg_config = EndpointConfig::Mjpeg { frames: cam.mjpeg };
 
     let cfg = ServerConfig{
         port: 8080,
@@ -148,7 +154,6 @@ pub async fn dev_main() {
             let steer_chan = Channel::new(0.0);
             let _steer_windows = WindowedAverageValueController::new(steer, &steer_chan, 25);
 
-
             let _drive_hbridge = HBridgeController::new(&drive_chan, drive_fwd_out, drive_rev_out, drive_enable_out);
             let _steer_hbridge = HBridgeController::new(&steer_chan, steer_left_out, steer_right_out, steer_enable_out);     
         },
@@ -181,6 +186,17 @@ pub async fn dev_main() {
         },
         _ => {
             panic!("wrong! failed to build lights system!");
+        }
+    }
+
+    match (
+        server.inputs.get("enable_camera"),
+    ) {
+        (Some(TypedInput::Bool(enable_camera)),) => {
+            let _ = IdentityController::new(enable_camera, &cam_enable_chan);
+        },
+        _ => {
+            panic!("wrong! unable to build camera controls!");
         }
     }
 
