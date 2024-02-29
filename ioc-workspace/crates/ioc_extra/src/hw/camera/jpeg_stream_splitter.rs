@@ -116,11 +116,10 @@ pub fn split_jpegs(
                 }
                 
             } else {
-                warn!("read zero bytes!!!");
                 break;
             }
         }
-        info!("shutting down child process!");
+        info!("child process stream ended.")
     });
 
     rx
