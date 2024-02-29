@@ -1,15 +1,15 @@
 use ioc_core::channel::Channel;
 use ioc_core::input::SumInput;
+use ioc_core::{Input, Output};
 use ioc_extra::controller::average::WindowedAverageValueController;
 use ioc_extra::hw::{servo::ServoController, hbridge::HBridgeController};
-use ioc_extra::output::childproc::ChildProcessInput;
 use ioc_extra::hw::camera::Camera;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use tracing::{error,info};
+use tracing::{error,warn,info};
 use ioc_core::controller::IdentityController;
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
 use ioc_devices::devices::pca9685::{Pca9685DeviceConfig, Pca9685Device};
-use ioc_devices::devices::lsm303::{Lsm303DeviceConfig, Lsm303Device};
+use ioc_devices::devices::lsm303dlhc::Lsm303dlhcDevice;
 use std::collections::HashMap;
 
 pub async fn littlefoot_main() {
@@ -29,11 +29,18 @@ pub async fn littlefoot_main() {
         ("drive", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("steer", ServerInputConfig::Float{ start: 0.0, min: -1.0, max: 1.0, step: 2.0/2048.0 }),
         ("headlights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
-        ("taillights", ServerInputConfig::Float{ start: 0.0, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
+        ("taillights", ServerInputConfig::Float{ start: 0.5, min: 0.0, max: 1.0, step: 1.0/2048.0 }),
         ("enable_camera", ServerInputConfig::Bool { start: true }),
     ]);
     
-    let output_configs = HashMap::from([]);
+    let output_configs = HashMap::from([
+        ("accel_x", ServerOutputConfig::Float),
+        ("accel_y", ServerOutputConfig::Float),
+        ("accel_z", ServerOutputConfig::Float),
+        ("mag_x", ServerOutputConfig::Float),
+        ("mag_y", ServerOutputConfig::Float),
+        ("mag_z", ServerOutputConfig::Float),    
+    ]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
         inputs: vec![
@@ -42,7 +49,10 @@ pub async fn littlefoot_main() {
              "headlights", "taillights",
              "enable_camera" 
         ],
-        outputs: vec![],
+        outputs: vec![
+            "accel_x","accel_y","accel_z",
+            "mag_x", "mag_y", "mag_z",
+        ],
     };
 
     let static_endpoint_config = EndpointConfig::Static {
@@ -91,11 +101,8 @@ pub async fn littlefoot_main() {
     };
     let pwm = Pca9685Device::build(confg, i2c).unwrap();
 
-    // let i2c = ioc_rpi_gpio::get_bus();
-    // let confg = Lsm303DeviceConfig{
-
-    // };
-    // let mag_accel = Lsm303Device::build(confg, i2c).unwrap();
+    let i2c = ioc_rpi_gpio::get_bus();
+    let mag_accel = Lsm303dlhcDevice::new(i2c).unwrap();
 
     match (
         server.inputs.get("pan"),
@@ -111,7 +118,7 @@ pub async fn littlefoot_main() {
             Some(TypedInput::Float(pan_trim)),
             Some(TypedInput::Float(tilt_trim)),
             Some(pan_out),
-            Some(tilt_out),            
+            Some(tilt_out),
         ) => {
             //servo controllers for pan and tilt
             let pan_sum = SumInput::new(50, vec![pan, pan_trim]);
@@ -202,6 +209,66 @@ pub async fn littlefoot_main() {
         _ => {
             panic!("wrong! unable to build camera controls!");
         }
+    }
+
+    match (
+        server.outputs.get("accel_x"),
+        server.outputs.get("accel_y"),
+        server.outputs.get("accel_z"),
+    ) {
+        (
+            Some(TypedOutput::Float(accel_x)),
+            Some(TypedOutput::Float(accel_y)),
+            Some(TypedOutput::Float(accel_z)),   
+        ) => {
+            let x_out = accel_x.sink().tx;
+            let y_out = accel_y.sink().tx;
+            let z_out = accel_z.sink().tx;
+
+            let mut rx = mag_accel.accelerometer.source().rx;
+
+            tokio::spawn(async move {
+                while let Ok((x,y,z)) = rx.recv().await {
+                    tokio::join!(
+                        x_out.send(x),
+                        y_out.send(y),
+                        z_out.send(z),
+                    );
+                }
+                warn!("done publishing accel!");
+            });
+        },
+        _ => panic!("wrong! unable to build accelerometer system")
+    }
+
+    match (
+        server.outputs.get("mag_x"),
+        server.outputs.get("mag_y"),
+        server.outputs.get("mag_z"),
+    ) {
+        (
+            Some(TypedOutput::Float(mag_x)),
+            Some(TypedOutput::Float(mag_y)),
+            Some(TypedOutput::Float(mag_z)),   
+        ) => {
+            let x_out = mag_x.sink().tx;
+            let y_out = mag_y.sink().tx;
+            let z_out = mag_z.sink().tx;
+
+            let mut rx = mag_accel.accelerometer.source().rx;
+
+            tokio::spawn(async move {
+                while let Ok((x,y,z)) = rx.recv().await {
+                    tokio::join!(
+                        x_out.send(x),
+                        y_out.send(y),
+                        z_out.send(z),
+                    );
+                }
+                warn!("done publishing accel!");
+            });
+        },
+        _ => panic!("wrong! unable to build accelerometer system")
     }
 
 

@@ -1,10 +1,10 @@
 use ioc_extra::hw::camera::Camera;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::{error,info};
-
-use ioc_core::{controller::IdentityController, input::SumInput, channel::Channel};
+use tokio::time::{sleep, Duration};
+use ioc_core::{Output, controller::IdentityController, input::SumInput, channel::Channel};
 use ioc_server::{Server, ServerConfig, EndpointConfig, ServerOutputConfig, ServerInputConfig, TypedInput, TypedOutput};
-use ioc_extra::{hw::hbridge::HBridgeController, output::childproc::ChildProcessInput};
+use ioc_extra::hw::hbridge::HBridgeController;
 use ioc_extra::controller::average::WindowedAverageValueController;
 use std::collections::HashMap;
 
@@ -40,6 +40,13 @@ pub async fn dev_main() {
         ("steer_enable_out", ServerOutputConfig::Float),
         ("headlights_out", ServerOutputConfig::Float),
         ("taillights_out", ServerOutputConfig::Float),  
+
+        ("accel_x", ServerOutputConfig::Float),
+        ("accel_y", ServerOutputConfig::Float),
+        ("accel_z", ServerOutputConfig::Float),
+        ("mag_x", ServerOutputConfig::Float),
+        ("mag_y", ServerOutputConfig::Float),
+        ("mag_z", ServerOutputConfig::Float),  
     ]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
@@ -50,7 +57,10 @@ pub async fn dev_main() {
             "headlights", "taillights",
             "enable_camera",
         ],
-        outputs: vec![],
+        outputs: vec![
+            "accel_x","accel_y","accel_z",
+            "mag_x", "mag_y", "mag_z",
+        ],
     };
 
     let debug_ws_endpoint_config = EndpointConfig::WebSocket { 
@@ -68,11 +78,9 @@ pub async fn dev_main() {
     };
 
     info!("building camera mjpeg stream...");
-    // let mjpeg_in = ChildProcessInput::new();
     let cam_enable_chan = Channel::new(true);
     let cam = Camera::new(&cam_enable_chan);
     
-
     info!("building camera mjpeg endpoint...");
     let mjpeg_config = EndpointConfig::Mjpeg { frames: cam.mjpeg };
 
@@ -92,7 +100,6 @@ pub async fn dev_main() {
     };
        
     let server = Server::try_build(cfg).await.unwrap();
-    println!("built server state!");
 
     match (
         server.inputs.get("pan"),
@@ -198,6 +205,64 @@ pub async fn dev_main() {
         _ => {
             panic!("wrong! unable to build camera controls!");
         }
+    }
+
+
+    match (
+        server.outputs.get("accel_x"),
+        server.outputs.get("accel_y"),
+        server.outputs.get("accel_z"),
+    ) {
+        (
+            Some(TypedOutput::Float(accel_x)),
+            Some(TypedOutput::Float(accel_y)),
+            Some(TypedOutput::Float(accel_z)),   
+        ) => {
+            let x_out = accel_x.sink().tx;
+            let y_out = accel_y.sink().tx;
+            let z_out = accel_z.sink().tx;
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::join!(
+                        x_out.send(0.0),
+                        y_out.send(0.0),
+                        z_out.send(0.0),
+                        sleep(Duration::from_millis(1000)),
+                    );
+                }
+            });
+        },
+        _ => panic!("wrong! unable to build accelerometer system")
+    }
+
+    match (
+        server.outputs.get("mag_x"),
+        server.outputs.get("mag_y"),
+        server.outputs.get("mag_z"),
+    ) {
+        (
+            Some(TypedOutput::Float(mag_x)),
+            Some(TypedOutput::Float(mag_y)),
+            Some(TypedOutput::Float(mag_z)),   
+        ) => {
+            let x_out = mag_x.sink().tx;
+            let y_out = mag_y.sink().tx;
+            let z_out = mag_z.sink().tx;
+
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::join!(
+                        x_out.send(0.0),
+                        y_out.send(0.0),
+                        z_out.send(0.0),
+                        sleep(Duration::from_millis(1000)),
+                    );
+                }
+            });
+        },
+        _ => panic!("wrong! unable to build accelerometer system")
     }
 
 

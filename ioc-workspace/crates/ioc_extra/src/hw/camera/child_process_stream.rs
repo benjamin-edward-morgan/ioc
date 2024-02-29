@@ -28,8 +28,7 @@ pub fn start_child_process<O>(
     kill_switch: impl Future<Output = ()> + Send + 'static,
 ) -> Result<O, ChildProcessError>
 {
-    info!("Spawing child process... [{} {}]", cmd, args.join(" "));
-
+    info!("spawing child process ... [{} {}]", cmd, args.join(" "));
     let mut child = Command::new(cmd)
         .args(args)
         .stderr(Stdio::inherit())
@@ -41,23 +40,21 @@ pub fn start_child_process<O>(
             "Unable to open stdout stream from child priocess"
         ))?;
 
-    info!("creating stream handler for child process...");
+    info!("creating stream handler for child process ...");
     let output = stream_handler(child_out);
 
-    info!("spawning task to wait for child...");
+    info!("waiting for child process to exit ...");
     tokio::spawn(async move {
         tokio::select! {
             child_res = child.wait() => {
-                error!("child exited unexpectedly! {:?}", child_res);
+                error!("child process exited unexpectedly! {:?}", child_res);
             },
             _ = kill_switch => {
-                info!("killing child {:?}", child);
+                info!("killing child process ...");
                 child.kill().await.unwrap();
-                info!("done killing child");
             }
         }        
     });
     
-    info!("returning child process ouput");
     Ok(output)
 }
