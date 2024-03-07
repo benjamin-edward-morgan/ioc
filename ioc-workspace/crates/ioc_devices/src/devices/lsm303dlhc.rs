@@ -1,38 +1,13 @@
 
-use std::{sync::{Arc, Mutex}, time::Duration};
+use std::time::Duration;
 
 use ioc_core::{Input,InputSource};
 use embedded_hal_0::blocking::i2c;
 
 use lsm303dlhc::Lsm303dlhc;
 use tokio::{sync::broadcast, time::sleep};
-use tracing::{info, warn};
-
-pub struct VectorInput {
-    value: Arc<Mutex<(f64,f64,f64)>>,
-    rx: broadcast::Receiver<(f64, f64, f64)>,
-}
-
-impl VectorInput {
-    pub fn new(rx: broadcast::Receiver<(f64,f64,f64)>) -> Self {
-        VectorInput { value: Arc::new(Mutex::new((0.0, 0.0, 0.0))), rx: rx }
-    }
-}
-
-impl Input<(f64, f64, f64)> for VectorInput {
-    fn source(&self) -> InputSource<(f64, f64, f64)> {
-        let current_val = match self.value.lock() {
-            Ok(current_val) => {
-                current_val.to_owned()
-            },
-            Err(mut poisoned) => {
-                poisoned.get_mut().clone()
-            }
-        };
-
-        InputSource { start: current_val, rx: self.rx.resubscribe() }
-    }
-}
+use tracing::warn;
+use super::VectorInput;
 
 pub struct Lsm303dlhcDevice {
     pub accelerometer: VectorInput,
