@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub struct DeviceConfigError {
    pub message: String
@@ -6,7 +5,7 @@ pub struct DeviceConfigError {
 
 
 impl DeviceConfigError {
-    pub fn fro_str(s: &str) -> Self {
+    pub fn from_str(s: &str) -> Self {
         Self{
             message: s.to_string()
         }

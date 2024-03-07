@@ -47,6 +47,11 @@ pub async fn dev_main() {
         ("mag_x", ServerOutputConfig::Float),
         ("mag_y", ServerOutputConfig::Float),
         ("mag_z", ServerOutputConfig::Float),  
+        ("gyro_x", ServerOutputConfig::Float),
+        ("gyro_y", ServerOutputConfig::Float),
+        ("gyro_z", ServerOutputConfig::Float),  
+        ("temperature", ServerOutputConfig::Float),
+        ("pressure", ServerOutputConfig::Float),
     ]);
 
     let ws_endpoint_config = EndpointConfig::WebSocket {
@@ -60,6 +65,8 @@ pub async fn dev_main() {
         outputs: vec![
             "accel_x","accel_y","accel_z",
             "mag_x", "mag_y", "mag_z",
+            "gyro_x", "gyro_y", "gyro_z",
+            "temperature", "pressure"
         ],
     };
 
@@ -225,9 +232,9 @@ pub async fn dev_main() {
             tokio::spawn(async move {
                 loop {
                     tokio::join!(
-                        x_out.send(0.0),
-                        y_out.send(0.0),
-                        z_out.send(0.0),
+                        x_out.send(rand::random::<f64>()-0.5),
+                        y_out.send(rand::random::<f64>()-0.5),
+                        z_out.send(rand::random::<f64>()-0.5),
                         sleep(Duration::from_millis(1000)),
                     );
                 }
@@ -254,10 +261,63 @@ pub async fn dev_main() {
             tokio::spawn(async move {
                 loop {
                     tokio::join!(
-                        x_out.send(0.0),
-                        y_out.send(0.0),
-                        z_out.send(0.0),
+                        x_out.send((rand::random::<f64>()-0.5)*0.04),
+                        y_out.send((rand::random::<f64>()-0.5)*0.04),
+                        z_out.send((rand::random::<f64>()-0.5)*0.04),
                         sleep(Duration::from_millis(1000)),
+                    );
+                }
+            });
+        },
+        _ => panic!("wrong! unable to build magnetometer system")
+    }
+
+    match (
+        server.outputs.get("gyro_x"),
+        server.outputs.get("gyro_y"),
+        server.outputs.get("gyro_z"),
+    ) {
+        (
+            Some(TypedOutput::Float(gyro_x)),
+            Some(TypedOutput::Float(gyro_y)),
+            Some(TypedOutput::Float(gyro_z)),   
+        ) => {
+            let x_out = gyro_x.sink().tx;
+            let y_out = gyro_y.sink().tx;
+            let z_out = gyro_z.sink().tx;
+
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::join!(
+                        x_out.send((rand::random::<f64>()-0.5)*40.0),
+                        y_out.send((rand::random::<f64>()-0.5)*40.0),
+                        z_out.send((rand::random::<f64>()-0.5)*40.0),
+                        sleep(Duration::from_millis(1000)),
+                    );
+                }
+            });
+        },
+        _ => panic!("wrong! unable to build gyro system")
+    }
+
+    match (
+        server.outputs.get("temperature"),
+        server.outputs.get("pressure"),
+    ) {
+        (
+            Some(TypedOutput::Float(temperature)),
+            Some(TypedOutput::Float(pressure)),  
+        ) => {
+            let t_out = temperature.sink().tx;
+            let p_out = pressure.sink().tx;
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::join!(
+                        t_out.send(22.0 + rand::random::<f64>()-0.5),
+                        p_out.send(993.2 + rand::random::<f64>()-0.5),
+                        sleep(Duration::from_millis(10000)),
                     );
                 }
             });
