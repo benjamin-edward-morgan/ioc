@@ -17,7 +17,7 @@ pub(crate) struct WebSocketEndpoint {
 }
 
 impl WebSocketEndpoint {
-    pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: Vec<&str>, outputs: Vec<&str>) -> Self {
+    pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: &[String], outputs: &[String]) -> Self {
         let ws_mgr = WebSocketManager::new(cmd_tx, inputs, outputs);
 
         Self{

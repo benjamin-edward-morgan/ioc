@@ -18,19 +18,20 @@ pub(crate) enum Endpoint {
 }
 
 impl Endpoint {
-    pub fn try_build(cmd_tx: &mpsc::Sender<StateCmd>, config: EndpointConfig) -> Self {
+    pub fn try_build(cmd_tx: &mpsc::Sender<StateCmd>, config: &EndpointConfig) -> Self {
         match config {
             EndpointConfig::WebSocket{ inputs, outputs } => {
-                let ws_endpoint = WebSocketEndpoint::new(cmd_tx, inputs, outputs);
+                let ws_endpoint = WebSocketEndpoint::new(cmd_tx, inputs.as_slice(), outputs.as_slice());
                 Endpoint::WebSocket(ws_endpoint)
             },
             EndpointConfig::Static{ directory } => {
-                let static_endpoint = StaticDirEndpoint::new( directory );
+                let static_endpoint = StaticDirEndpoint::new( &directory );
                 Endpoint::Static(static_endpoint)
             },
-            EndpointConfig::Mjpeg { frames } => {
-                let mjpeg_endpoint = MjpegStreamEndpoint{ frames };
-                Endpoint::MjpegStream(mjpeg_endpoint)
+            EndpointConfig::Mjpeg { frames_output } => {
+                todo!()
+                // let mjpeg_endpoint = MjpegStreamEndpoint{ frames };
+                // Endpoint::MjpegStream(mjpeg_endpoint)
             }
         }
     }

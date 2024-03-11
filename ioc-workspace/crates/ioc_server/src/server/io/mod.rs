@@ -20,7 +20,7 @@ impl ServerIoBuilder {
     pub(crate) async fn try_build_input(
         &self,
         key: &str,
-        config: ServerInputConfig,
+        config: &ServerInputConfig,
     ) -> Result<TypedInput, ServerBuildError> {
         let (subs_tx, subs_rx) = oneshot::channel();
 
@@ -113,7 +113,7 @@ impl ServerIoBuilder {
     pub(crate) async fn try_build_output(
         &self,
         key: &str,
-        config: ServerOutputConfig,
+        config: &ServerOutputConfig,
     ) -> Result<TypedOutput, ServerBuildError> {
         let typed_output = match config {
             ServerOutputConfig::Float => {

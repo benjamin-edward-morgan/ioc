@@ -7,6 +7,8 @@ edition = "2021"
 jpeg-encoder = { version = "0.6.0" }
 ioc_core = { path = "../ioc_core" }
 tokio-util = {version = "0.7.10" }
+rand = "0.8.5"
+
 tracing.workspace = true
 tokio.workspace = true
 serde.workspace = true
