@@ -12,7 +12,7 @@ pub(crate) struct WebSocketManager {
 }
 
 impl WebSocketManager {
-    pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: Vec<&str>, outputs: Vec<&str>) -> Self {
+    pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: &[String], outputs: &[String]) -> Self {
 
         let inputs: HashSet<String> = inputs.into_iter().map(|s| s.to_string()).collect();
         let outputs: HashSet<String> = outputs.into_iter().map(|s| s.to_string()).collect();

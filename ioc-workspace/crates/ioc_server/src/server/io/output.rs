@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use tokio::sync::mpsc;
 
+#[derive(Debug)]
 pub struct ServerOutput<T: Send + 'static> {
     pub handle: JoinHandle<()>,
     sink_tx: mpsc::Sender<T>,

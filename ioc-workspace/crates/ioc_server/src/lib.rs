@@ -2,7 +2,11 @@ pub mod error;
 pub(crate) mod server;
 
 use std::collections::HashMap;
-use tokio::sync::watch;
+use std::rc::Rc;
+use ioc_core::InputKind;
+use ioc_core::ModuleIO;
+use ioc_core::ModuleBuilder;
+use ioc_core::OutputKind;
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -18,7 +22,7 @@ use crate::server::{
     state::ServerState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum ServerInputConfig {
     Float {
         start: f64,
@@ -35,34 +39,36 @@ pub enum ServerInputConfig {
     },
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum ServerOutputConfig {
     Float,
     Bool,
     String,
 }
 
-pub enum EndpointConfig<'a> {
+#[derive(Deserialize, Debug)]
+pub enum EndpointConfig {
     WebSocket {
-        inputs: Vec<&'a str>,
-        outputs: Vec<&'a str>,
+        inputs: Vec<String>,
+        outputs: Vec<String>,
     },
     Static {
-        directory: &'a str,
+        directory: String,
     },
     Mjpeg {
-        frames: watch::Receiver<Vec<u8>>,
+        frames_output: String,
     }
 }
 
-pub struct ServerConfig<'a> {
+#[derive(Deserialize, Debug)]
+pub struct ServerConfig {
     pub port: u16,
-    pub root_context: &'a str,
-    pub inputs: HashMap<&'a str, ServerInputConfig>,
-    pub outputs: HashMap<&'a str, ServerOutputConfig>,
-    pub endpoints: HashMap<&'a str, EndpointConfig<'a>>,
-    pub state_channel_size: usize,
-    pub io_channel_size: usize,
+    pub root_context: String,
+    pub inputs: HashMap<String, ServerInputConfig>,
+    pub outputs: HashMap<String, ServerOutputConfig>,
+    pub endpoints: HashMap<String, EndpointConfig>,
+    pub state_channel_size: Option<usize>,
+    pub io_channel_size: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -72,24 +78,60 @@ pub enum TypedInput {
     String(ServerInput<String>),
 }
 
+#[derive(Debug)]
 pub enum TypedOutput {
     Float(ServerOutput<f64>),
     Bool(ServerOutput<bool>),
     String(ServerOutput<String>),
 }
 
-pub struct Server<'a> {
+pub struct Server {
     pub handle: JoinHandle<()>,
-    pub inputs: HashMap<&'a str, TypedInput>,
-    pub outputs: HashMap<&'a str, TypedOutput>,
+    pub inputs: HashMap<String, TypedInput>,
+    pub outputs: HashMap<String, TypedOutput>,
 }
 
-impl<'a> Server<'a> {
-    pub async fn try_build(cfg: ServerConfig<'a>) -> Result<Self, ServerBuildError> {
+impl From<Server> for ModuleIO {
+    fn from(server: Server) -> Self {
+        let mut inputs = HashMap::with_capacity(server.inputs.len());
+        for (k, input) in server.inputs {
+            let ik = match input {
+                TypedInput::String(str) => InputKind::String(Box::new(str)),
+                TypedInput::Float(float) => InputKind::Float(Box::new(float)),
+                TypedInput::Bool(bool) => InputKind::Bool(Box::new(bool)),
+            };
+            inputs.insert(k.to_string(), ik);
+        }
+
+        let mut outputs = HashMap::with_capacity(server.outputs.len());
+        for (k, output) in server.outputs {
+            let ok = match output {
+                TypedOutput::String(str) => OutputKind::String(Box::new(str)),
+                TypedOutput::Float(float) => OutputKind::Float(Box::new(float)),
+                TypedOutput::Bool(bool) => OutputKind::Bool(Box::new(bool)),
+                
+            };
+            outputs.insert(k.to_string(), ok);
+        }
+
+
+        ModuleIO { 
+            join_handle: server.handle,
+            inputs, 
+            outputs,
+        }
+    }
+}
+
+impl ModuleBuilder for Server {
+    type Config = ServerConfig;
+    type Error = ServerBuildError;
+
+    async fn try_build(cfg: &ServerConfig) -> Result<Self, ServerBuildError> {
         info!("building server state ...");
 
         //global state
-        let state = ServerState::try_build(cfg.state_channel_size, &cfg.inputs, &cfg.outputs)?;
+        let state = ServerState::try_build(cfg.state_channel_size.unwrap_or(16), &cfg.inputs, &cfg.outputs)?;
         let cmd_tx = state.cmd_tx;
 
         info!("building server inputs, outputs ...");
@@ -100,26 +142,26 @@ impl<'a> Server<'a> {
 
         let io_builder = ServerIoBuilder {
             cmd_tx: cmd_tx.clone(),
-            channel_size: cfg.io_channel_size,
+            channel_size: cfg.io_channel_size.unwrap_or(16),
         };
         info!("building server inputs ...");
-        for (key, input_config) in cfg.inputs {
-            let srv_input = io_builder.try_build_input(key, input_config).await?;
-            inputs.insert(key, srv_input);
+        for (key, input_config) in cfg.inputs.iter() {
+            let srv_input = io_builder.try_build_input(&key, input_config).await?;
+            inputs.insert(key.to_string(), srv_input);
         }
         info!("building server outputs ...");
-        for (key, output_config) in cfg.outputs {
-            let srv_output = io_builder.try_build_output(key, output_config).await?;
-            outputs.insert(key, srv_output);
+        for (key, output_config) in cfg.outputs.iter() {
+            let srv_output = io_builder.try_build_output(&key, output_config).await?;
+            outputs.insert(key.to_string(), srv_output);
         }
 
         //build router service from endpoint configs
-       info!("building routers ...");
+        info!("building routers ...");
         let mut router_service = axum::routing::Router::new();
-        for (key, ep_config) in cfg.endpoints {
+        for (key, ep_config) in cfg.endpoints.iter() {
             info!("building router {} ...", key);
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
-            router_service = endpoint.apply(key, router_service);
+            router_service = endpoint.apply(&key, router_service);
         }
         router_service = router_service.layer(
             TraceLayer::new_for_http()
@@ -146,3 +188,35 @@ impl<'a> Server<'a> {
         })
     }
 }
+
+
+// impl ModuleBuilder for Server {
+
+
+//     fn join_handle(self) -> JoinHandle<()> {
+//         self.handle
+//     }
+
+//     fn inputs<'a>(&'a self) -> HashMap<String, InputKind<'a>> {
+        
+//     }
+
+//     fn input(&self, name: &str) -> Option<InputKind> {
+//         self.inputs.get(name).map(|input| {
+//             match input {
+//                 TypedInput::String(str_input) => InputKind::String(str_input),
+//                 TypedInput::Float(float_input) => InputKind::Float(float_input),
+//                 TypedInput::Bool(bool_input) => InputKind::Bool(bool_input),    
+//             }
+//         })
+//     }
+//     fn output(&self, name: &str) -> Option<OutputKind> {
+//         self.outputs.get(name).map(|output| {
+//             match output {
+//                 TypedOutput::String(str_out) => OutputKind::String(str_out),
+//                 TypedOutput::Float(float_out) => OutputKind::Float(float_out),
+//                 TypedOutput::Bool(bool_out) => OutputKind::Bool(bool_out),
+//             }
+//         })
+//     }
+// }

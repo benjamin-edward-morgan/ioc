@@ -23,15 +23,12 @@ pub(crate) enum ServerInputState {
     },
 }
 
-
 #[derive(Debug, Clone)]
 pub(crate) enum ServerOutputState {
     Float { value: Option<f64> },
     Bool { value: Option<bool> },
     String { value: Option<String> },
 }
-
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct StateUpdate {
@@ -82,8 +79,8 @@ pub(crate) struct ServerState {
 impl ServerState {
     pub(crate) fn try_build(
         channel_size: usize,
-        inputs: &HashMap<&str, ServerInputConfig>,
-        outputs: &HashMap<&str, ServerOutputConfig>,
+        inputs: &HashMap<String, ServerInputConfig>,
+        outputs: &HashMap<String, ServerOutputConfig>,
     ) -> Result<Self, ServerBuildError> {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(channel_size);
 

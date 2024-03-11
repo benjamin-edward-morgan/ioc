@@ -1,7 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, rc::Rc, sync::{Arc, Mutex}};
 use tokio::sync::{broadcast,mpsc};
 use tracing::{info,warn,error};
-use crate::{Input, InputSource};
+use crate::{Input, InputKind, InputSource, Transformer, TransformerI};
 
 pub struct SumInput {
     values: Arc<Mutex<Vec<f64>>>,
@@ -9,12 +9,12 @@ pub struct SumInput {
 }
 
 struct IndexedUpdate {
-    pub idx: usize,
-    pub value: f64,
+    idx: usize,
+    value: f64,
 }
 
 impl SumInput {
-    pub fn new(channel_size: usize, inputs: Vec<&dyn Input<f64>>) -> Self {
+    pub fn new(channel_size: usize, inputs: &[&dyn Input<f64>]) -> Self {
         
         let mut start_values = Vec::with_capacity(inputs.len());
         let mut receivers = Vec::with_capacity(inputs.len());
@@ -107,5 +107,36 @@ impl Input<f64> for SumInput {
                 }
             }
         }
+    }
+}
+
+pub struct SumConfig<'a> {
+    pub inputs: Vec<&'a dyn Input<f64>>,
+}
+
+pub struct Sum{
+    pub value: SumInput,
+}
+
+impl Into<TransformerI> for Sum {
+    fn into(self) -> TransformerI {
+        TransformerI { 
+            inputs:  HashMap::from([
+                ("value".to_owned(), InputKind::Float(Box::new(self.value)))
+            ])
+        }
+    }
+}
+
+impl <'a> Transformer<'a> for Sum {
+    type Config = SumConfig<'a>;
+    type Error = String;
+
+    async fn try_build(cfg: &SumConfig<'a>) -> Result<Sum, String> {
+        Ok(
+            Sum{
+                value: SumInput::new(10, &cfg.inputs),
+            }
+        )
     }
 }

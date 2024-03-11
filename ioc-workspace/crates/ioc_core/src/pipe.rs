@@ -2,16 +2,15 @@
 use crate::{Input, Output};
 use tracing::{info,error};
 use tokio::task::JoinHandle;
-pub struct IdentityController {
+pub struct Pipe {
     pub handle: JoinHandle<()>,
 }
 
-
-impl IdentityController {
+impl Pipe {
     pub fn new<T: Clone + Send + 'static>(
         input: &dyn Input<T>,
         output: &dyn Output<T>,
-    ) -> IdentityController {
+    ) -> Pipe {
 
         let mut source = input.source();
         let sink = output.sink();
@@ -25,20 +24,19 @@ impl IdentityController {
                 match source.rx.recv().await {
                     Ok(t) => {
                         if let Err(err) = sink.tx.send(t).await {
-                            error!("IdentityController error sending to sink: {}", err);
+                            error!("Pipe error sending to sink: {}", err);
                             break;
                         }
                     },
                     Err(err) => {
-                        error!("IdentityController error receiving from source: {}", err);
-                        // break;
+                        error!("Pipe error receiving from source: {}", err);
                     }
                 }
             }
-            info!("Identity controller shutting down!")
+            info!("Pipe shutting down!")
         });
 
-        IdentityController{
+        Pipe{
             handle,
         }
     }
