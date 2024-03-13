@@ -1,7 +1,7 @@
 use crate::server::state::{StateCmd,StateUpdate,ServerOutputState};
 
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::debug;
 use ioc_core::{Output, OutputSink};
 use std::collections::HashMap;
 
@@ -40,7 +40,7 @@ impl <T: Send + 'static> ServerOutput<T> {
                     panic!("error sending state update cmd in server output {:?}", err);
                 }
             }
-            info!("server output shutting down!");
+            debug!("server output shutting down");
         });
 
         Self{

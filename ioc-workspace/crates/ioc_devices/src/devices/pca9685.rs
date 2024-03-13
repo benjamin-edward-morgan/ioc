@@ -1,25 +1,40 @@
 
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use ioc_core::{Output,OutputSink};
+use futures::future::join_all;
+use ioc_core::{error::IocBuildError, ModuleBuilder, ModuleIO, Output, OutputKind, OutputSink};
 use pwm_pca9685::{Address, Pca9685, Channel};
 use embedded_hal_0::blocking::i2c;
-use tokio::sync::mpsc;
+use serde::Deserialize;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::error::DeviceConfigError;
 
-use tracing::{error,warn,info};
+use tracing::{error,info};
 
 //system level config -- corresponds to 1 pwm chip instance 
-#[derive(Debug)]
-pub struct Pca9685DeviceConfig<'a> {
+#[derive(Debug, Deserialize)]
+pub struct Pca9685DeviceConfig {
     pub i2c_address: u8,
-    pub channels: HashMap<&'a str, u8>
+    pub channels: HashMap<String, u8>
 }
 
 //connected pwm chip instance
-pub struct Pca9685Device<'a> {
-    pub channels: HashMap<&'a str, Pca9685PwmOutput>
+pub struct Pca9685Device {
+    pub join_handle: JoinHandle<()>,
+    pub channels: HashMap<String, Pca9685PwmOutput>
+}
+
+impl From<Pca9685Device> for ModuleIO {
+    fn from(dev: Pca9685Device) -> Self {
+        ModuleIO { 
+            join_handle: dev.join_handle, 
+            inputs: HashMap::new(), 
+            outputs: dev.channels.into_iter()
+                .map(|(key, out)| (key, OutputKind::float(out)))
+                .collect()
+        }
+    }
 }
 
 impl <E> From<pwm_pca9685::Error<E>> for DeviceConfigError 
@@ -35,9 +50,8 @@ E: std::fmt::Debug,
     }
 }
 
-impl Pca9685Device<'_>
-{
-    pub fn build<I2C, E>(config: Pca9685DeviceConfig, i2c: I2C) -> Result<Pca9685Device,DeviceConfigError>  
+impl Pca9685Device {
+    pub fn build<I2C, E>(config: &Pca9685DeviceConfig, i2c: I2C) -> Result<Pca9685Device,DeviceConfigError>  
     where
         E: std::fmt::Debug,
         I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
@@ -51,15 +65,65 @@ impl Pca9685Device<'_>
         let device = Arc::new(Mutex::new(device));
 
         let mut channels = HashMap::with_capacity(config.channels.len());
-        for (k, c) in config.channels {
-            let output = Pca9685PwmOutput::try_build(device.clone(), c)?;
-            channels.insert(k, output);
+        let mut join_handles: Vec<JoinHandle<()>> = Vec::with_capacity(config.channels.len());
+        for (k, c) in &config.channels {
+            let output = Pca9685PwmOutput::try_build(device.clone(), *c)?;
+            channels.insert(k.to_string(), output);
         }
 
+        let join_handle = tokio::spawn(async move {
+            join_all(join_handles).await;
+            info!("pca 9685 is done!")
+        });
+
         Ok(Pca9685Device { 
+            join_handle,
             channels
         })
     }
+}
+
+
+
+
+pub struct Pca9685DeviceBuilder<E, I2C, F>
+where
+    E: std::fmt::Debug,
+    I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    i2c_bus_provider: F,
+}
+
+impl <E, I2C, F> Pca9685DeviceBuilder<E, I2C, F> 
+where
+    E: std::fmt::Debug,
+    I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    pub fn new(i2c_bus_provider: F) -> Pca9685DeviceBuilder<E, I2C, F> {
+        Pca9685DeviceBuilder { 
+            i2c_bus_provider,
+        }
+    }
+}
+
+
+impl <E, I2C, F> ModuleBuilder for Pca9685DeviceBuilder<E, I2C, F> 
+where
+    E: std::fmt::Debug,
+    I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    type Config = Pca9685DeviceConfig;
+    type Module = Pca9685Device; 
+
+    async fn try_build(&self, cfg: &Pca9685DeviceConfig) -> Result<Pca9685Device, IocBuildError> {
+        let i2c = (self.i2c_bus_provider)(0);
+        let dev = Pca9685Device::build(cfg, i2c)?;
+        Ok(dev)
+    }
+
 }
 
 

@@ -1,0 +1,43 @@
+metadata:
+  description: hello world!
+
+# modules expose inputs and outputs from various sources
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs:
+        pan: 
+          Float: { start: 0.0, min: -1, max: 1.0, step: 0.0009765625 }
+        tilt: 
+          Float: { start: 0.0, min: -1, max: 1.0, step: 0.0009765625 }
+      outputs:
+        temperature: Float
+      endpoints: 
+        "/": 
+          Static:
+            directory: "assets"
+        "/ws":
+          WebSocket: 
+            inputs: [ pan, tilt ]
+            outputs: [ temperature ]
+
+  noise1:
+    Noise:
+      min: -0.1
+      max: 0.1
+      period_ms: 100
+
+# transformers read from one or more inputs and produce one or more new inputs
+transformers:
+  pan_tilt_sum:
+    Sum:
+      inputs:
+        - local_server.pan
+        - local_server.tilt
+        - noise1.value
+
+# pipes read from inputs and write to outputs
+pipes:
+  - { from: pan_tilt_sum.value, to: local_server.temperature }

@@ -5,16 +5,6 @@ use tokio::sync::broadcast;
 
 pub mod noise;
 
-#[derive(Debug)]
-pub struct InputConfigError {
-    pub message: String
-}
-
-impl InputConfigError {
-    pub fn from_str(message: &str) -> Self {
-        InputConfigError { message: message.to_string() }
-    }
-}
 
 pub struct SimpleInput<T: Clone> {
     current_value: Arc<Mutex<T>>,

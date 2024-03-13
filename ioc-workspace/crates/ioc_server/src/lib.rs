@@ -1,11 +1,11 @@
-pub mod error;
 pub(crate) mod server;
 
 use std::collections::HashMap;
-use std::rc::Rc;
+
+use ioc_core::error::IocBuildError;
 use ioc_core::InputKind;
 use ioc_core::ModuleIO;
-use ioc_core::ModuleBuilder;
+use ioc_core::Module;
 use ioc_core::OutputKind;
 use tokio::task::JoinHandle;
 use tracing::info;
@@ -16,7 +16,6 @@ use tower_http::trace::TraceLayer;
 
 use serde::Deserialize;
 
-use crate::error::ServerBuildError;
 use crate::server::{
     endpoint::Endpoint, io::input::ServerInput, io::output::ServerOutput, io::ServerIoBuilder,
     state::ServerState,
@@ -100,7 +99,7 @@ impl From<Server> for ModuleIO {
                 TypedInput::Float(float) => InputKind::Float(Box::new(float)),
                 TypedInput::Bool(bool) => InputKind::Bool(Box::new(bool)),
             };
-            inputs.insert(k.to_string(), ik);
+            inputs.insert(k, ik);
         }
 
         let mut outputs = HashMap::with_capacity(server.outputs.len());
@@ -111,7 +110,7 @@ impl From<Server> for ModuleIO {
                 TypedOutput::Bool(bool) => OutputKind::Bool(Box::new(bool)),
                 
             };
-            outputs.insert(k.to_string(), ok);
+            outputs.insert(k, ok);
         }
 
 
@@ -123,11 +122,10 @@ impl From<Server> for ModuleIO {
     }
 }
 
-impl ModuleBuilder for Server {
+impl Module for Server {
     type Config = ServerConfig;
-    type Error = ServerBuildError;
 
-    async fn try_build(cfg: &ServerConfig) -> Result<Self, ServerBuildError> {
+    async fn try_build(cfg: &ServerConfig) -> Result<Self, IocBuildError> {
         info!("building server state ...");
 
         //global state
@@ -146,12 +144,12 @@ impl ModuleBuilder for Server {
         };
         info!("building server inputs ...");
         for (key, input_config) in cfg.inputs.iter() {
-            let srv_input = io_builder.try_build_input(&key, input_config).await?;
+            let srv_input = io_builder.try_build_input(key, input_config).await?;
             inputs.insert(key.to_string(), srv_input);
         }
         info!("building server outputs ...");
         for (key, output_config) in cfg.outputs.iter() {
-            let srv_output = io_builder.try_build_output(&key, output_config).await?;
+            let srv_output = io_builder.try_build_output(key, output_config).await?;
             outputs.insert(key.to_string(), srv_output);
         }
 
@@ -161,7 +159,7 @@ impl ModuleBuilder for Server {
         for (key, ep_config) in cfg.endpoints.iter() {
             info!("building router {} ...", key);
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
-            router_service = endpoint.apply(&key, router_service);
+            router_service = endpoint.apply(key, router_service);
         }
         router_service = router_service.layer(
             TraceLayer::new_for_http()
@@ -179,8 +177,6 @@ impl ModuleBuilder for Server {
                 .unwrap();
         });
 
-        //let handle = futures::future::join_all(vec![server_handle, state.handle]).await.map(|_| {});
-
         Ok(Server {
             handle: server_handle,
             inputs,
@@ -188,35 +184,3 @@ impl ModuleBuilder for Server {
         })
     }
 }
-
-
-// impl ModuleBuilder for Server {
-
-
-//     fn join_handle(self) -> JoinHandle<()> {
-//         self.handle
-//     }
-
-//     fn inputs<'a>(&'a self) -> HashMap<String, InputKind<'a>> {
-        
-//     }
-
-//     fn input(&self, name: &str) -> Option<InputKind> {
-//         self.inputs.get(name).map(|input| {
-//             match input {
-//                 TypedInput::String(str_input) => InputKind::String(str_input),
-//                 TypedInput::Float(float_input) => InputKind::Float(float_input),
-//                 TypedInput::Bool(bool_input) => InputKind::Bool(bool_input),    
-//             }
-//         })
-//     }
-//     fn output(&self, name: &str) -> Option<OutputKind> {
-//         self.outputs.get(name).map(|output| {
-//             match output {
-//                 TypedOutput::String(str_out) => OutputKind::String(str_out),
-//                 TypedOutput::Float(float_out) => OutputKind::Float(float_out),
-//                 TypedOutput::Bool(bool_out) => OutputKind::Bool(bool_out),
-//             }
-//         })
-//     }
-// }

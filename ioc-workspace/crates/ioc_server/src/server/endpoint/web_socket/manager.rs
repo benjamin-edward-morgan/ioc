@@ -14,8 +14,8 @@ pub(crate) struct WebSocketManager {
 impl WebSocketManager {
     pub fn new(cmd_tx: &mpsc::Sender<StateCmd>, inputs: &[String], outputs: &[String]) -> Self {
 
-        let inputs: HashSet<String> = inputs.into_iter().map(|s| s.to_string()).collect();
-        let outputs: HashSet<String> = outputs.into_iter().map(|s| s.to_string()).collect();
+        let inputs: HashSet<String> = inputs.iter().map(|s| s.to_string()).collect();
+        let outputs: HashSet<String> = outputs.iter().map(|s| s.to_string()).collect();
         let (websocket_tx, mut websocket_rx) = mpsc::channel(10);
 
         let task_state_cmd_tx = cmd_tx.clone();

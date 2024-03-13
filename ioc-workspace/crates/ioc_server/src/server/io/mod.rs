@@ -1,12 +1,12 @@
 pub mod input;
 pub mod output;
 
-use crate::error::ServerBuildError;
 use crate::server::state::{ServerInputState, ServerOutputState};
 use crate::server::state::StateCmd;
 use crate::{ServerInputConfig, ServerOutputConfig, TypedInput, TypedOutput};
 
 use input::ServerInput;
+use ioc_core::error::IocBuildError;
 use output::ServerOutput;
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
@@ -21,7 +21,7 @@ impl ServerIoBuilder {
         &self,
         key: &str,
         config: &ServerInputConfig,
-    ) -> Result<TypedInput, ServerBuildError> {
+    ) -> Result<TypedInput, IocBuildError> {
         let (subs_tx, subs_rx) = oneshot::channel();
 
         let cmd = StateCmd::Subscribe{
@@ -31,7 +31,7 @@ impl ServerIoBuilder {
         };
 
         if let Err(err) = self.cmd_tx.send(cmd).await {
-            return Err(ServerBuildError::new(format!(
+            return Err(IocBuildError::from_string(format!(
                 "error sending subscription command {}",
                 err
             )));
@@ -40,7 +40,7 @@ impl ServerIoBuilder {
         let subs = match subs_rx.await {
             Ok(subs) => subs,
             Err(err) => {
-                return Err(ServerBuildError::new(format!(
+                return Err(IocBuildError::from_string(format!(
                     "Error getting subscription for ServerInput {:?}",
                     err
                 )));
@@ -51,7 +51,7 @@ impl ServerIoBuilder {
             .start
             .inputs
             .get(key)
-            .ok_or(ServerBuildError::new(format!(
+            .ok_or(IocBuildError::from_string(format!(
                 "subscription start did not contain key {:?}",
                 key
             )))?;
@@ -102,8 +102,8 @@ impl ServerIoBuilder {
                 );
                 Ok(TypedInput::String(input))
             }
-            (_, _) => Err(ServerBuildError::new(
-                "Got mismatched typed attempting to construct ServerInput.".to_string(),
+            (_, _) => Err(IocBuildError::message(
+                "Got mismatched typed attempting to construct ServerInput.",
             )),
         }?;
 
@@ -114,7 +114,7 @@ impl ServerIoBuilder {
         &self,
         key: &str,
         config: &ServerOutputConfig,
-    ) -> Result<TypedOutput, ServerBuildError> {
+    ) -> Result<TypedOutput, IocBuildError> {
         let typed_output = match config {
             ServerOutputConfig::Float => {
                 let output = ServerOutput::new(

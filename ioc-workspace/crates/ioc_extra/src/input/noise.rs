@@ -1,12 +1,11 @@
 use std::{collections::HashMap, time::Duration};
-
-use ioc_core::{InputKind, ModuleIO, ModuleBuilder, OutputKind};
+use ioc_core::{error::IocBuildError, InputKind, Module, ModuleIO};
 use serde::Deserialize;
 use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 use rand::random;
 use tracing::warn;
 
-use super::{InputConfigError, SimpleInput};
+use super::SimpleInput;
 
 #[derive(Deserialize, Debug)]
 pub struct NoiseInputConfig {
@@ -17,23 +16,26 @@ pub struct NoiseInputConfig {
 
 pub struct NoiseInput {
     pub handle: JoinHandle<()>,
-    pub input: SimpleInput<f64>,
+    pub value: SimpleInput<f64>,
 }
 
 impl From<NoiseInput> for ModuleIO {
-    fn from(value: NoiseInput) -> Self {
-        todo!()
+    fn from(noise: NoiseInput) -> Self {
+        ModuleIO { 
+            join_handle: noise.handle, 
+            inputs: HashMap::from([("value".to_owned(), InputKind::float(noise.value))]), 
+            outputs: HashMap::new()
+        }
     }
 }
 
-impl ModuleBuilder for NoiseInput {
+impl Module for NoiseInput {
     type Config = NoiseInputConfig;
-    type Error = InputConfigError;
 
-    async fn try_build(cfg: &NoiseInputConfig) -> Result<NoiseInput, InputConfigError>  {
+    async fn try_build(cfg: &NoiseInputConfig) -> Result<NoiseInput, IocBuildError>  {
         if cfg.max < cfg.min {
             Err(
-                InputConfigError::from_str("Must have max >= min for Noise input.")
+                IocBuildError::message("Must have max >= min for Noise input.")
             )
         } else {
             let (tx, rx) = broadcast::channel(10);
@@ -48,7 +50,7 @@ impl ModuleBuilder for NoiseInput {
                     let new_value = random::<f64>()*m+b;
 
                     if let Err(err) = tx.send(new_value) {
-                        warn!("error sending value from noise. sutting down! {:?}", err);
+                        warn!("error sending value from noise. shutting down! {:?}", err);
                         break;
                     }
 
@@ -57,37 +59,9 @@ impl ModuleBuilder for NoiseInput {
             }); 
 
             Ok(
-                NoiseInput { handle, input }
+                NoiseInput { handle, value: input }
             )
         }
     }
 
 }
-
-// impl ModuleBuilder for NoiseInput {
-//     // type Config = NoiseInputConfig;
-//     // type Error = InputConfigError;
-
-
-//     fn input(&self, name: &str) -> Option<InputKind> {
-//         if name.eq("value") { 
-//             Some(InputKind::Float(&self.input))
-//         } else {
-//             None
-//         }
-//     }
-
-//     fn output(&self, _name: &str) -> Option<OutputKind> {
-//         None
-//     }
-    
-//     fn inputs<'a>(&'a self) -> HashMap<String, InputKind<'a>> {
-//         HashMap::from([
-//             ("value".to_string(), InputKind::Float(&self.input))
-//         ])
-//     }
-    
-//     fn join_handle(self) -> tokio::task::JoinHandle<()> {
-//         self.handle
-//     }
-// }
