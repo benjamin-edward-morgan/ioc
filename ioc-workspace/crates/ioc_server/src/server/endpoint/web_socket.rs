@@ -25,10 +25,6 @@ impl WebSocketEndpoint {
         }
     }
 
-    // pub fn method_router(&self) -> MethodRouter {
-    //     get(handle_ws_upgrade).with_state(self.ws_mgr.websocket_tx.clone())
-    // }
-
     pub fn apply(self, key: &str, router: Router) -> Router {
         router.route(key, 
             get(handle_ws_upgrade).with_state(self.ws_mgr.websocket_tx.clone())

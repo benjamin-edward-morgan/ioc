@@ -1,6 +1,6 @@
-use crate::error::ServerBuildError;
 use crate::{ServerInputConfig, ServerOutputConfig};
 use std::collections::{HashMap,HashSet};
+use ioc_core::error::IocBuildError;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{info,error};
@@ -81,7 +81,7 @@ impl ServerState {
         channel_size: usize,
         inputs: &HashMap<String, ServerInputConfig>,
         outputs: &HashMap<String, ServerOutputConfig>,
-    ) -> Result<Self, ServerBuildError> {
+    ) -> Result<Self, IocBuildError> {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(channel_size);
 
         let mut internal_inputs: HashMap<String, ServerInputState> = HashMap::with_capacity(inputs.len());
@@ -122,7 +122,6 @@ impl ServerState {
                             }
                         }
 
-                        //TODO: filter intial inputs and outputs
                         let subs = Subscription {
                             start: StateUpdate{
                                 inputs: filtered_inputs,

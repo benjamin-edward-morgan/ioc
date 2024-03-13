@@ -1,13 +1,12 @@
-use std::{collections::HashMap, rc::Rc, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 use tokio::sync::{broadcast,mpsc};
 use tracing::{info,warn,error};
-use crate::{Input, InputKind, InputSource, Transformer, TransformerI};
+use crate::{error::IocBuildError, Input, InputKind, InputSource, Transformer, TransformerI};
 
 pub struct SumInput {
     values: Arc<Mutex<Vec<f64>>>,
     rx: broadcast::Receiver<f64>,
 }
-
 struct IndexedUpdate {
     idx: usize,
     value: f64,
@@ -88,10 +87,8 @@ impl SumInput {
     }
 }
 
-
 impl Input<f64> for SumInput {
     fn source(&self) -> InputSource<f64> {
-        
         match self.values.lock() {
             Ok(values) => {
                 InputSource{
@@ -118,11 +115,12 @@ pub struct Sum{
     pub value: SumInput,
 }
 
-impl Into<TransformerI> for Sum {
-    fn into(self) -> TransformerI {
+impl From<Sum> for TransformerI {
+    fn from(val: Sum) -> Self {
         TransformerI { 
+            join_handle: tokio::spawn(async move { println!("this is wrong") }), //todo
             inputs:  HashMap::from([
-                ("value".to_owned(), InputKind::Float(Box::new(self.value)))
+                ("value".to_string(), InputKind::float(val.value))
             ])
         }
     }
@@ -130,9 +128,8 @@ impl Into<TransformerI> for Sum {
 
 impl <'a> Transformer<'a> for Sum {
     type Config = SumConfig<'a>;
-    type Error = String;
 
-    async fn try_build(cfg: &SumConfig<'a>) -> Result<Sum, String> {
+    async fn try_build(cfg: &SumConfig<'a>) -> Result<Sum, IocBuildError> {
         Ok(
             Sum{
                 value: SumInput::new(10, &cfg.inputs),

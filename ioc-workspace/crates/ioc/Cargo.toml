@@ -7,7 +7,7 @@ edition = "2021"
 default = [ "server", "extra" ]
 all = [ "default", "rpi", "devices", "extra" ]
 rpi = [ "dep:ioc_rpi_gpio" ]
-devices = ["dep:ioc_devices" ]
+devices = [ "dep:ioc_devices" ]
 server = [ "dep:ioc_server" ]
 extra = [ "dep:ioc_extra" ]
 
@@ -18,7 +18,7 @@ ioc_rpi_gpio = { path = "../ioc_rpi_gpio", optional = true }
 ioc_devices = { path = "../ioc_devices", features = ["all"], optional = true }
 ioc_server = { path = "../ioc_server", optional = true }
 rand = "0.8.5"
-config = { version = "0.14.0", features = ["yaml"] }
+config_rs = { version = "0.14.0", package="config", features = ["yaml"] }
 
 tracing.workspace = true
 tracing-subscriber.workspace = true

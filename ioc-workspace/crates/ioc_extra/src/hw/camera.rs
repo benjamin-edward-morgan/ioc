@@ -2,10 +2,10 @@ mod image;
 mod child_process_stream;
 mod jpeg_stream_splitter;
 
-use std::{ops::Deref, sync::{Arc, Mutex}};
+use std::ops::Deref;
 use futures::Future;
 use ioc_core::Input;
-use tokio::{sync::{broadcast, oneshot, watch}, task::JoinHandle};
+use tokio::sync::{broadcast, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 use image::TestPatternGenerator;
 use tracing::{info, warn};
@@ -35,7 +35,7 @@ impl CameraState {
                 if let Ok(frame_tx) = stream.callback.await {
                     let tp: Vec<u8> = TestPatternGenerator::new(640, 480, 50).generate().bytes;
                     frame_tx.send(tp).unwrap();
-                    Self::StreamEnded(StreamEndedState{frame_tx: frame_tx, enable_rx: stream.enable_rx.resubscribe()})
+                    Self::StreamEnded(StreamEndedState{frame_tx, enable_rx: stream.enable_rx.resubscribe()})
                 } else {
                     panic!("did not get frame_tx from callback :(");
                 }
@@ -90,7 +90,7 @@ fn spawn_camera(frame_tx: watch::Sender<Vec<u8>>, enable_rx: broadcast::Receiver
     let (callback_tx, callback_rx) = oneshot::channel();
     tokio::spawn(async move {
         if let Ok(mut frames) = start_mjpeg_stream(kill_switch) {
-            while let Ok(_) = frames.changed().await {
+            while frames.changed().await.is_ok() {
                 let last_frame = frames.borrow();
                 if let Some(lf) = last_frame.deref() {
                     frame_tx.send(lf.bytes.clone()).expect("Error sending camera frame");

@@ -25,13 +25,12 @@ impl Endpoint {
                 Endpoint::WebSocket(ws_endpoint)
             },
             EndpointConfig::Static{ directory } => {
-                let static_endpoint = StaticDirEndpoint::new( &directory );
+                let static_endpoint = StaticDirEndpoint::new( directory );
                 Endpoint::Static(static_endpoint)
             },
             EndpointConfig::Mjpeg { frames_output } => {
-                todo!()
-                // let mjpeg_endpoint = MjpegStreamEndpoint{ frames };
-                // Endpoint::MjpegStream(mjpeg_endpoint)
+                let mjpeg_endpoint = todo!(); //MjpegStreamEndpoint{ frames_output };
+                Endpoint::MjpegStream(mjpeg_endpoint)
             }
         }
     }

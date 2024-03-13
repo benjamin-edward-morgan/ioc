@@ -1,0 +1,125 @@
+metadata:
+  description: hello world!
+
+# modules expose inputs and outputs from various sources
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs:
+        drive:
+          Float: { start: 0.0, min: -1, max: 1, step: 0.0009765625 }
+        steer:
+          Float: { start: 0.0, min: -1, max: 1, step: 0.0009765625 }
+        pan: 
+          Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
+        pan_trim: 
+          Float: { start: 0.0625, min: -1, max: 1, step: 0.0009765625 }
+        tilt: 
+          Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
+        tilt_trim: 
+          Float: { start: 0.7138671875, min: -1, max: 1, step: 0.0009765625 }
+        headlights:
+          Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
+        taillights:
+          Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
+      outputs:
+        accel_x: Float
+        accel_y: Float
+        accel_z: Float
+        mag_x: Float
+        mag_y: Float
+        mag_z: Float
+        gyro_x: Float
+        gyro_y: Float
+        gyro_z: Float
+        temperature: Float 
+        pressure: Float 
+
+        pan_dev: Float 
+        tilt_dev: Float
+        drive_fwd_dev: Float
+        drive_rev_dev: Float
+        drive_enable_dev: Float
+        steer_left_dev: Float
+        steer_right_dev: Float
+        steer_enable_dev: Float
+        headlights_dev: Float
+        taillights_dev: Float
+      endpoints: 
+        "/": 
+          Static:
+            directory: "assets"
+        "/ws":
+          WebSocket: 
+            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights ]
+            outputs: [ accel_x, accel_y, accel_z, mag_x, mag_y, mag_z, gyro_x, gyro_y, gyro_z, temperature, pressure ]
+        "/debug":
+          WebSocket:
+            inputs: [ ]
+            outputs: [ pan_dev, tilt_dev, drive_fwd_dev, drive_rev_dev, drive_enable_dev, steer_left_def, steer_right_def, steer_enable_dev, headlights_dev, taillights_dev ]
+
+  noise1:
+    Noise:
+      min: -0.1
+      max: 0.1
+      period_ms: 1000
+
+# transformers read from one or more inputs and produce one or more new inputs
+transformers:
+  pan_sum:
+    Sum:
+      inputs:
+        - local_server.pan
+        - local_server.pan_trim
+  
+  tilt_sum:
+    Sum:
+      inputs:
+        - local_server.tilt
+        - local_server.tilt_trim
+
+  tilt_servo: 
+    LinearTransform:
+      input: tilt_sum.value 
+      from: [0, 1]
+      to: [0.05, 0.15]
+  
+  pan_servo: 
+    LinearTransform:
+      input: pan_sum.value
+      from: [0, 1]
+      to: [0.05, 0.15]
+
+  drive_hbridge:
+    HBridge:
+      input: local_server.drive 
+  
+  steer_hbridge:
+    HBridge:
+      input: local_server.steer
+
+# pipes read from inputs and write to outputs
+pipes:
+  - { from: pan_servo.value, to: local_server.pan_dev }
+  - { from: tilt_servo.value, to: local_server.tilt_dev }
+  - { from: drive_hbridge.forward, to: local_server.drive_fwd_dev }
+  - { from: drive_hbridge.reverse, to: local_server.drive_rev_dev }
+  - { from: drive_hbridge.enable, to: local_server.drive_enable_dev }
+  - { from: steer_hbridge.forward, to: local_server.steer_left_dev }
+  - { from: steer_hbridge.reverse, to: local_server.steer_right_dev }
+  - { from: steer_hbridge.enable, to: local_server.steer_enable_dev }
+  - { from: local_server.headlights, to: local_server.headlights_dev }
+  - { from: local_server.taillights, to: local_server.taillights_dev }
+  - { from: noise1.value, to: local_server.accel_x }
+  - { from: noise1.value, to: local_server.accel_y }
+  - { from: noise1.value, to: local_server.accel_z }
+  - { from: noise1.value, to: local_server.mag_x }
+  - { from: noise1.value, to: local_server.mag_y }
+  - { from: noise1.value, to: local_server.mag_z }
+  - { from: noise1.value, to: local_server.gyro_x }
+  - { from: noise1.value, to: local_server.gyro_y }
+  - { from: noise1.value, to: local_server.gyro_z }
+  - { from: noise1.value, to: local_server.temperature }
+  - { from: noise1.value, to: local_server.pressure }

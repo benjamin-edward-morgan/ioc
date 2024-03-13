@@ -5,9 +5,8 @@ edition = "2021"
 
 
 [features]
-all = [ "lsm303agr", "pca9685", "lsm303dlhc", "l3gd20", "bmp180" ]
+all = [ "pca9685", "lsm303dlhc", "l3gd20", "bmp180" ]
 pca9685 = [ "dep:pwm-pca9685", "embedded-hal-0" ]
-lsm303agr = [ "dep:lsm303agr", "embedded-hal" ]
 lsm303dlhc = [ "dep:lsm303dlhc", "embedded-hal-0" ]
 l3gd20 = [ "embedded-hal" ]
 bmp180 = [ "embedded-hal" ]
@@ -18,7 +17,6 @@ lsm303agr = { version = "1.0.0", optional = true }
 lsm303dlhc = { version = "0.2.0", optional = true }
 embedded-hal-0 = { version = "0.2.7", package = "embedded-hal", optional = true }
 embedded-hal = { version = "1.0.0-rc.2", optional = true }
-
 
 ioc_core = { path = "../ioc_core" }
 

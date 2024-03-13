@@ -6,6 +6,7 @@ pub mod error;
 use crate::error::BuildError;
 pub use rppal;
 use rppal::{gpio::Gpio, i2c::I2c};
+use tracing::info;
 
 
 
@@ -30,6 +31,9 @@ impl RpiGpio {
 }
 
 
-pub fn get_bus() -> I2c {
-    I2c::new().unwrap()
+pub fn get_bus(bus: u8) -> I2c {
+    //I2c::with_bus(bus).unwrap()
+    let i2c = I2c::new().unwrap();
+    info!("i2c bus: {}", i2c.bus());
+    i2c
 }

@@ -1,9 +1,11 @@
-use std::{collections::HashMap, fmt, future::Future, rc::Rc};
+use std::{collections::HashMap, fmt, future::Future};
+use error::IocBuildError;
 use tokio::{sync::{broadcast, mpsc}, task::JoinHandle};
 
 pub mod channel;
 pub mod pipe;
 pub mod transformer;
+pub mod error; 
 
 pub struct InputSource<T> {
     pub start: T,
@@ -27,6 +29,22 @@ pub enum InputKind {
     Binary(Box<dyn Input<Vec<u8>>>),
     Float(Box<dyn Input<f64>>),
     Bool(Box<dyn Input<bool>>),
+}
+
+impl InputKind {
+    //some functions to save you from writing `Box::new`
+    pub fn float<F: Input<f64> + 'static>(f: F) -> Self {
+        Self::Float(Box::new(f))
+    }
+    pub fn binary<F: Input<Vec<u8>> + 'static>(f: F) -> Self {
+        Self::Binary(Box::new(f))
+    }
+    pub fn string<F: Input<String> + 'static>(f: F) -> Self {
+        Self::String(Box::new(f))
+    }
+    pub fn bool<F: Input<bool> + 'static>(f: F) -> Self {
+        Self::Bool(Box::new(f))
+    }
 }
 
 impl fmt::Debug for InputKind {
@@ -58,26 +76,48 @@ impl fmt::Debug for OutputKind {
     }
 }
 
+impl OutputKind {
+    //some functions to save you from writing `Box::new`
+    pub fn float<F: Output<f64> + 'static>(f: F) -> Self {
+        Self::Float(Box::new(f))
+    }
+    pub fn binary<F: Output<Vec<u8>> + 'static>(f: F) -> Self {
+        Self::Binary(Box::new(f))
+    }
+    pub fn string<F: Output<String> + 'static>(f: F) -> Self {
+        Self::String(Box::new(f))
+    }
+    pub fn bool<F: Output<bool> + 'static>(f: F) -> Self {
+        Self::Bool(Box::new(f))
+    }
+}
+
 pub struct ModuleIO {
     pub join_handle: JoinHandle<()>,
     pub inputs: HashMap<String, InputKind>,
     pub outputs: HashMap<String, OutputKind>,
 }
 
-pub trait ModuleBuilder: Into<ModuleIO> {
+pub trait Module: Into<ModuleIO> {
     type Config;
-    type Error; 
 
-    fn try_build(cfg: &Self::Config) -> impl Future<Output=Result<Self, Self::Error>> ;
+    fn try_build(cfg: &Self::Config) -> impl Future<Output=Result<Self, IocBuildError>> ;
+}
+
+pub trait ModuleBuilder {
+    type Config;
+    type Module: Into<ModuleIO>;
+
+    fn try_build(&self, cfg: &Self::Config) -> impl Future<Output=Result<Self::Module, IocBuildError>> ;
 }
 
 pub struct TransformerI {
+    pub join_handle: JoinHandle<()>,
     pub inputs: HashMap<String, InputKind>,
 }
 
 pub trait Transformer<'a>: Into<TransformerI> {
     type Config;
-    type Error;
 
-    fn try_build(cfg: &Self::Config) -> impl Future<Output=Result<Self, Self::Error>> ;
+    fn try_build(cfg: &Self::Config) -> impl Future<Output=Result<Self, IocBuildError>> ;
 }

@@ -5,9 +5,6 @@ use tokio::sync::broadcast;
 #[cfg(feature = "pca9685")]
 pub mod pca9685;
 
-#[cfg(feature = "lsm303agr")]
-pub mod lsm303agr;
-
 #[cfg(feature = "lsm303dlhc")]
 pub mod lsm303dlhc;
 
@@ -25,7 +22,7 @@ pub struct VectorInput {
 impl VectorInput {
     //TODO: task that updates value 
     pub fn new(rx: broadcast::Receiver<(f64,f64,f64)>) -> Self {
-        VectorInput { value: Arc::new(Mutex::new((f64::NAN, f64::NAN, f64::NAN))), rx: rx }
+        VectorInput { value: Arc::new(Mutex::new((f64::NAN, f64::NAN, f64::NAN))), rx }
     }
 }
 
@@ -36,7 +33,7 @@ impl Input<(f64, f64, f64)> for VectorInput {
                 current_val.to_owned()
             },
             Err(mut poisoned) => {
-                poisoned.get_mut().clone()
+                **poisoned.get_mut()
             }
         };
 
@@ -52,7 +49,7 @@ pub struct ScalerInput {
 impl ScalerInput {
     //TODO: task that updates value 
     pub fn new(rx: broadcast::Receiver<f64>) -> Self {
-        Self{ value: Arc::new(Mutex::new(f64::NAN)), rx: rx }
+        Self{ value: Arc::new(Mutex::new(f64::NAN)), rx }
     }
 }
 
@@ -63,7 +60,7 @@ impl Input<f64> for ScalerInput {
                 current_val.to_owned()
             },
             Err(mut poisoned) => {
-                poisoned.get_mut().clone()
+                **poisoned.get_mut()
             }
         };
 

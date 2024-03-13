@@ -1,7 +1,7 @@
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::watch;
 use crate::hw::camera::image::JpegImage;
-use tracing::{warn,info};
+use tracing::info;
 
 enum SplitJpegState {
     Marker1, //looking for 0xFF
