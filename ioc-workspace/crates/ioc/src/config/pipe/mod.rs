@@ -23,6 +23,7 @@ impl PipeConfig{
             (Some(InputKind::Binary(input)), Some(OutputKind::Binary(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
             (Some(InputKind::Float(input)), Some(OutputKind::Float(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
             (Some(InputKind::Bool(input)), Some(OutputKind::Bool(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::Array(input)), Some(OutputKind::Array(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
             (Some(input), Some(output)) => {
                 Err(
                     IocBuildError::from_string(

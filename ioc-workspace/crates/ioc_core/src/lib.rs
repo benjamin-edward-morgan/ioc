@@ -29,6 +29,7 @@ pub enum InputKind {
     Binary(Box<dyn Input<Vec<u8>>>),
     Float(Box<dyn Input<f64>>),
     Bool(Box<dyn Input<bool>>),
+    Array(Box<dyn Input<Vec<Value>>>),
 }
 
 impl InputKind {
@@ -45,6 +46,14 @@ impl InputKind {
     pub fn bool<F: Input<bool> + 'static>(f: F) -> Self {
         Self::Bool(Box::new(f))
     }
+    pub fn array<F: Input<Vec<Value>> + 'static>(f: F) -> Self {
+        Self::Array(Box::new(f))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Value{
+    Float(f64),
 }
 
 impl fmt::Debug for InputKind {
@@ -54,6 +63,7 @@ impl fmt::Debug for InputKind {
             Self::Binary(_) => f.write_str("Binary"),
             Self::Float(_) => f.write_str("Float"),
             Self::Bool(_) => f.write_str("Bool"),
+            Self::Array(_) => f.write_str("Array"),
         }
     }
 }
@@ -63,6 +73,7 @@ pub enum OutputKind {
     Binary(Box<dyn Output<Vec<u8>>>),
     Float(Box<dyn Output<f64>>),
     Bool(Box<dyn Output<bool>>),
+    Array(Box<dyn Output<Vec<Value>>>),
 }
 
 impl fmt::Debug for OutputKind {
@@ -72,6 +83,7 @@ impl fmt::Debug for OutputKind {
             Self::Binary(_) => f.write_str("Binary"),
             Self::Float(_) => f.write_str("Float"),
             Self::Bool(_) => f.write_str("Bool"),
+            Self::Array(_) => f.write_str("Array"),
         }
     }
 }

@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use embedded_hal::i2c;
-use tokio::{sync::broadcast, time::sleep};
+use ioc_core::{error::IocBuildError, InputKind, ModuleBuilder, ModuleIO, Value};
+use serde::Deserialize;
+use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 use tracing::{error, info, warn};
-
-use crate::error::DeviceConfigError;
 
 use super::VectorInput;
 
@@ -40,7 +40,7 @@ impl DataRate {
         }
     }
 
-    fn low_odr_bit(&self) -> u8 {
+    fn _low_odr_bit(&self) -> u8 {
         match *self {
             Self::Low0 | Self::Low1 | Self::Low2 => 1,
             Self::High0 | Self::High1 | Self::High2 | Self::High3 => 0,
@@ -66,7 +66,7 @@ impl DataScale {
     }
 }
 
-
+#[derive(Deserialize,Debug)]
 pub struct L3gd20DeviceConfig {
     pub i2c_address: u8,
 }
@@ -80,11 +80,12 @@ impl Default for L3gd20DeviceConfig {
 }
 
 pub struct L3gd20Device {
+    pub join_handle: JoinHandle<()>,
     pub gyroscope: VectorInput,
 }
 
 impl L3gd20Device {
-    pub fn new<I2C>(config: &L3gd20DeviceConfig, mut i2c: I2C) -> Result<Self, DeviceConfigError> 
+    pub fn try_build<I2C>(config: &L3gd20DeviceConfig, mut i2c: I2C) -> Result<Self, IocBuildError> 
     where
         I2C: i2c::I2c + Send + 'static,
     {
@@ -97,7 +98,7 @@ impl L3gd20Device {
         }
         if !has_valid_address {
             return Err(
-                DeviceConfigError::new(format!("Invalid I2C address for L3gd20."))
+                IocBuildError::from_string(format!("Invalid I2C address for L3gd20."))
             );
         }
 
@@ -105,22 +106,66 @@ impl L3gd20Device {
         let mut buffer = [0u8; 1];
         if let Err(err) = i2c.write_read(config.i2c_address, &[ID_REGISTER], &mut buffer) {
             return Err(
-                DeviceConfigError::new(format!("Error reading id from L3gd20. {:?}", err))
+                IocBuildError::from_string(format!("Error reading id from L3gd20. {:?}", err))
             );
         }
         if buffer[0] != EXPECTED_ID {
             return Err(
-                DeviceConfigError::new(format!("Got invalid id from L3gd20 device register. Got {} but expected {}. Another device may be connected.", buffer[0], EXPECTED_ID))
+                IocBuildError::from_string(format!("Got invalid id from L3gd20 device register. Got {} but expected {}. Another device may be connected.", buffer[0], EXPECTED_ID))
             );   
         }
 
         let (tx, rx) = broadcast::channel(10);
 
-        spawn_gyro_task(config.i2c_address, tx, i2c); 
+        let join_handle = spawn_gyro_task(config.i2c_address, tx, i2c); 
 
         Ok(Self {
+            join_handle: join_handle,
             gyroscope: VectorInput::new(rx),
         })
+    }
+}
+
+impl From<L3gd20Device> for ModuleIO {
+    fn from(dev: L3gd20Device) -> ModuleIO {
+        ModuleIO{
+            join_handle: dev.join_handle,
+            inputs: HashMap::from([
+                ("value".to_string(), InputKind::array(dev.gyroscope))
+            ]),
+            outputs: HashMap::new(),
+        }
+    }
+}
+
+pub struct L3gd20DeviceBuilder<I2C, F>
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    i2c_bus_provider: F,
+}
+
+impl <I2C, F> L3gd20DeviceBuilder<I2C, F>
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    pub fn new(i2c_bus_provider: F) -> Self {
+        L3gd20DeviceBuilder { i2c_bus_provider }
+    }
+}
+
+impl <I2C, F> ModuleBuilder for L3gd20DeviceBuilder<I2C, F>
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    type Config=L3gd20DeviceConfig;
+    type Module=L3gd20Device;
+
+    async fn try_build(&self, cfg: &L3gd20DeviceConfig) -> Result<L3gd20Device, IocBuildError>  {
+        L3gd20Device::try_build(cfg, (self.i2c_bus_provider)(1))
     }
 }
 
@@ -130,7 +175,7 @@ const MULTI_READ_MASK: u8 = 0x80;
 
 const ID_REGISTER: u8 = 0x0F;
 const CTRL1_REGISTER: u8 = 0x20;
-const OUT_X_LSB_REGISTER: u8 = 0x28;
+const _OUT_X_LSB_REGISTER: u8 = 0x28;
 const OUT_TEMP_REGISTER: u8 = 0x26;
 
 
@@ -140,7 +185,7 @@ fn ctrl1_register_value(dr: &DataRate, bw: u8, enabled: bool) -> u8 {
     (if enabled { 0b1111 } else { 0b0 })
 }
 
-fn spawn_gyro_task<I2C>(i2c_address: u8, tx: broadcast::Sender<(f64, f64, f64)>, mut i2c: I2C)
+fn spawn_gyro_task<I2C>(i2c_address: u8, tx: broadcast::Sender<Vec<Value>>, mut i2c: I2C) -> JoinHandle<()>
 where
     I2C: i2c::I2c + Send + 'static,
 {
@@ -174,7 +219,7 @@ where
             let y = scale.scale_output_dps(((buffer[5] as i16) << 8) | (buffer[4] as i16));
             let z = scale.scale_output_dps(((buffer[7] as i16) << 8) | (buffer[6] as i16));
 
-            tx.send((x,y,z)).unwrap();
+            tx.send(vec![Value::Float(x), Value::Float(y), Value::Float(z)]).unwrap();
 
             // println!("temp, status, gyro data! {:02X?}", buffer);
             // info!("gyro! {} {} {}", x, y, z);
@@ -192,8 +237,5 @@ where
 
         info!("shutting down gyro!");
 
-
-    });
-
-
+    })
 }

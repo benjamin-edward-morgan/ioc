@@ -1,3 +1,4 @@
+use ioc_core::Value;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -38,6 +39,9 @@ pub enum WsInputStateInitial {
     },
     Binary {
         value: Vec<u8>,
+    },
+    Array {
+        value: Vec<f64>
     }
 }
 
@@ -52,6 +56,8 @@ impl From<ServerInputState> for WsInputStateInitial {
                 WsInputStateInitial::String{value, max_length},     
             ServerInputState::Binary { value } => 
                 WsInputStateInitial::Binary{ value },
+            ServerInputState::Array { value } => 
+                WsInputStateInitial::Array{ value }
         }
     }
 }
@@ -62,6 +68,7 @@ pub enum WsOutputStateInitial {
     Bool { value: Option<bool> },
     String { value: Option<String> },
     Binary { value: Option<Vec<u8>> },
+    Array { value: Option<Vec<f64>> },
 }
 
 impl From<ServerOutputState> for WsOutputStateInitial {
@@ -75,6 +82,20 @@ impl From<ServerOutputState> for WsOutputStateInitial {
                 WsOutputStateInitial::String{ value },    
             ServerOutputState::Binary { value } => 
                 WsOutputStateInitial::Binary{ value },  
+            ServerOutputState::Array { value } => {
+                let value = match value {
+                    Some(value_vec) => {
+                        let vect = value_vec.iter().map(|val| {
+                            match val {
+                                Value::Float(f) => *f,
+                            }
+                        }).collect();
+                        Some(vect)
+                    },
+                    None => None,
+                };
+                WsOutputStateInitial::Array { value }
+            },
         }
     }
 }
@@ -115,6 +136,7 @@ pub enum WsStateUpdate {
     Float { value: f64 },
     String { value: String },
     Binary { value: Vec<u8> },
+    Array { value: Vec<f64> },
 }
 
 impl From<WsStateUpdate> for ServerInputState {
@@ -124,6 +146,7 @@ impl From<WsStateUpdate> for ServerInputState {
             WsStateUpdate::Bool{ value } => ServerInputState::Bool{ value },
             WsStateUpdate::String{ value } => ServerInputState::String{ value, max_length: 0 },
             WsStateUpdate::Binary { value } => ServerInputState::Binary{ value },
+            WsStateUpdate::Array { value } => ServerInputState::Array { value }
         }
     }
 }
@@ -139,6 +162,8 @@ impl From<ServerInputState> for WsStateUpdate {
                 WsStateUpdate::String{ value },
             ServerInputState::Binary { value } => 
                 WsStateUpdate::Binary { value },
+            ServerInputState::Array { value } => 
+                WsStateUpdate::Array { value },
         }
     }
 }
@@ -165,7 +190,17 @@ impl From<ServerOutputState> for Option<WsStateUpdate> {
                 value.map(|value| {
                     WsStateUpdate::Binary{ value }
                 })
-            }
+            },
+            ServerOutputState::Array { value } => {
+                value.map(|value| {
+                    let value = value.iter().map(|v| {
+                        match v {
+                            Value::Float(f) => *f,
+                        }
+                    }).collect();
+                    WsStateUpdate::Array{ value }
+                })
+            },
         }
     }
 }

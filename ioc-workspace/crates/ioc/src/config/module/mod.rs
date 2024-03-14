@@ -1,25 +1,30 @@
+use serde::Deserialize;
+use ioc_core::{error::IocBuildError, Module, ModuleBuilder, ModuleIO};
 
-use ioc_extra::hw::camera::{Camera, CameraConfig};
+
 //ioc_server 
 #[cfg(feature = "server")]
 use ioc_server::{Server, ServerConfig};
 
 //ioc_extra
 #[cfg(feature = "extra")]
-use ioc_extra::input::noise::{NoiseInput, NoiseInputConfig};
+use ioc_extra::{
+    input::noise::{NoiseInput, NoiseInputConfig},
+    hw::camera::{Camera, CameraConfig}
+};
 
 //ioc_devices
 #[cfg(feature = "devices")]
-use ioc_devices::devices::pca9685::{Pca9685DeviceBuilder,Pca9685DeviceConfig};
-#[cfg(feature = "devices")]
-use ioc_devices::devices::bmp180::{Bmp180DeviceBuilder,Bmp180DeviceConfig};
+use ioc_devices::devices::{
+    pca9685::{Pca9685DeviceBuilder,Pca9685DeviceConfig},
+    bmp180::{Bmp180DeviceBuilder,Bmp180DeviceConfig},
+    l3gd20::{L3gd20DeviceBuilder, L3gd20DeviceConfig},
+    lsm303dlhc::{Lsm303dlhcDeviceBuilder, Lsm303dlhcDeviceConfig}
+};
 
 //rpi (for i2c source)
 #[cfg(feature = "rpi")]
 use ioc_rpi_gpio::rppal::i2c::I2c;
-
-use serde::Deserialize;
-use ioc_core::{error::IocBuildError, Module, ModuleBuilder, ModuleIO};
 
 #[cfg(feature = "rpi")]
 fn i2c_bus_provider(bus: u8) -> I2c {
@@ -43,6 +48,10 @@ pub enum IocModuleConfig {
     Pca9685(Pca9685DeviceConfig),
     #[cfg(feature = "devices")]
     Bmp180(Bmp180DeviceConfig),
+    #[cfg(feature = "devices")]
+    L3dg20(L3gd20DeviceConfig),
+    #[cfg(feature = "devices")]
+    Lsm303dlhc(Lsm303dlhcDeviceConfig),
 }
 
 impl IocModuleConfig {
@@ -69,6 +78,14 @@ impl IocModuleConfig {
             #[cfg(feature = "devices")]
             Self::Bmp180(bmp180_config) => {
                 Bmp180DeviceBuilder::new(i2c_bus_provider).try_build(bmp180_config).await.map(|sensor| sensor.into())
+            }
+            #[cfg(feature = "devices")]
+            Self::L3dg20(l3dg20_cfg) => {
+                L3gd20DeviceBuilder::new(i2c_bus_provider).try_build(l3dg20_cfg).await.map(|sensor| sensor.into())
+            }
+            #[cfg(feature = "devices")]
+            Self::Lsm303dlhc(lsm303dlhc_cfg) => {
+                Lsm303dlhcDeviceBuilder::new(i2c_bus_provider).try_build(lsm303dlhc_cfg).await.map(|sensor| sensor.into())
             }
         }
     }

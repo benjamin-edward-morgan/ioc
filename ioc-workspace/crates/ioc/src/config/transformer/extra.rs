@@ -38,8 +38,8 @@ impl TransformerConfig for HBridgeTransformerConfig {
         HashSet::from([&self.input])
     }
 }
-
 #[derive(Deserialize,Debug)]
+
 pub struct LinearTransformerConfig {
     input: String,
     from: Vec<f64>,

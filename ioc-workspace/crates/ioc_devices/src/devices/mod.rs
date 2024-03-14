@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use ioc_core::{Input, InputSource};
+use ioc_core::{Input, InputSource, Value};
 use tokio::sync::broadcast;
 
 #[cfg(feature = "pca9685")]
@@ -15,25 +15,25 @@ pub mod l3gd20;
 pub mod bmp180;
 
 pub struct VectorInput {
-    value: Arc<Mutex<(f64,f64,f64)>>,
-    rx: broadcast::Receiver<(f64, f64, f64)>,
+    value: Arc<Mutex<Vec<Value>>>,
+    rx: broadcast::Receiver<Vec<Value>>,
 }
 
 impl VectorInput {
     //TODO: task that updates value 
-    pub fn new(rx: broadcast::Receiver<(f64,f64,f64)>) -> Self {
-        VectorInput { value: Arc::new(Mutex::new((f64::NAN, f64::NAN, f64::NAN))), rx }
+    pub fn new(rx: broadcast::Receiver<Vec<Value>>) -> Self {
+        VectorInput { value: Arc::new(Mutex::new(Vec::new())), rx }
     }
 }
 
-impl Input<(f64, f64, f64)> for VectorInput {
-    fn source(&self) -> InputSource<(f64, f64, f64)> {
+impl Input<Vec<Value>> for VectorInput {
+    fn source(&self) -> InputSource<Vec<Value>> {
         let current_val = match self.value.lock() {
             Ok(current_val) => {
                 current_val.to_owned()
             },
-            Err(mut poisoned) => {
-                **poisoned.get_mut()
+            Err(poisoned) => {
+                poisoned.get_ref().to_vec()
             }
         };
 

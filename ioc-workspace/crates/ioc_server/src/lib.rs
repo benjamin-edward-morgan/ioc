@@ -7,6 +7,8 @@ use ioc_core::InputKind;
 use ioc_core::ModuleIO;
 use ioc_core::Module;
 use ioc_core::OutputKind;
+use ioc_core::Value;
+use tokio::join;
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -44,6 +46,7 @@ pub enum ServerOutputConfig {
     Bool,
     String,
     Binary,
+    Array,
 }
 
 #[derive(Deserialize, Debug)]
@@ -84,6 +87,7 @@ pub enum TypedOutput {
     Bool(ServerOutput<bool>),
     String(ServerOutput<String>),
     Binary(ServerOutput<Vec<u8>>),
+    Array(ServerOutput<Vec<Value>>),
 }
 
 pub struct Server {
@@ -111,6 +115,7 @@ impl From<Server> for ModuleIO {
                 TypedOutput::Float(float) => OutputKind::Float(Box::new(float)),
                 TypedOutput::Bool(bool) => OutputKind::Bool(Box::new(bool)),
                 TypedOutput::Binary(binary) => OutputKind::Binary(Box::new(binary)),     
+                TypedOutput::Array(arr) => OutputKind::Array(Box::new(arr)),
             };
             outputs.insert(k, ok);
         }
@@ -179,8 +184,12 @@ impl Module for Server {
                 .unwrap();
         });
 
+        let join_handle = tokio::spawn(async move {
+            let _ = join!(server_handle, state.handle);
+        });
+
         Ok(Server {
-            handle: server_handle,
+            handle: join_handle,
             inputs,
             outputs,
         })
