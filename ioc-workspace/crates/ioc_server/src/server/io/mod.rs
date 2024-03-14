@@ -143,6 +143,15 @@ impl ServerIoBuilder {
                 );
                 TypedOutput::String(output)
             },
+            ServerOutputConfig::Binary => {
+                let output = ServerOutput::new(
+                    key,
+                    self.cmd_tx.clone(),
+                    self.channel_size,
+                    |b: Vec<u8>| ServerOutputState::Binary { value: Some(b) }
+                );
+                TypedOutput::Binary(output)
+            }
         };
 
         Ok(typed_output)

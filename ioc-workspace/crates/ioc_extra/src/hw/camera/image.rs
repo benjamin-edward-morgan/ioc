@@ -3,6 +3,7 @@
 
 use jpeg_encoder::Encoder;
 
+#[derive(Clone, Debug)]
 pub struct JpegImage {
     pub bytes: Vec<u8>
 }

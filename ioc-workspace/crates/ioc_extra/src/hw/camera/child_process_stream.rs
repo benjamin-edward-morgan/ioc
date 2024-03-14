@@ -25,7 +25,7 @@ pub fn start_child_process<O>(
     cmd: &str,
     args: &[&str],
     stream_handler: fn(ChildStdout) -> O,
-    kill_switch: impl Future<Output = ()> + Send + 'static,
+    // kill_switch: impl Future<Output = ()> + Send + 'static,
 ) -> Result<O, ChildProcessError>
 {
     info!("spawing child process ... [{} {}]", cmd, args.join(" "));
@@ -49,10 +49,10 @@ pub fn start_child_process<O>(
             child_res = child.wait() => {
                 error!("child process exited unexpectedly! {:?}", child_res);
             },
-            _ = kill_switch => {
-                info!("killing child process ...");
-                child.kill().await.unwrap();
-            }
+            // _ = kill_switch => {
+            //     info!("killing child process ...");
+            //     child.kill().await.unwrap();
+            // }
         }        
     });
     

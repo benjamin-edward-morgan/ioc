@@ -1,4 +1,5 @@
 
+use ioc_extra::hw::camera::{Camera, CameraConfig};
 //ioc_server 
 #[cfg(feature = "server")]
 use ioc_server::{Server, ServerConfig};
@@ -10,6 +11,8 @@ use ioc_extra::input::noise::{NoiseInput, NoiseInputConfig};
 //ioc_devices
 #[cfg(feature = "devices")]
 use ioc_devices::devices::pca9685::{Pca9685DeviceBuilder,Pca9685DeviceConfig};
+#[cfg(feature = "devices")]
+use ioc_devices::devices::bmp180::{Bmp180DeviceBuilder,Bmp180DeviceConfig};
 
 //rpi (for i2c source)
 #[cfg(feature = "rpi")]
@@ -32,10 +35,14 @@ pub enum IocModuleConfig {
     //ioc_extra 
     #[cfg(feature = "extra")]
     Noise(NoiseInputConfig),
+    #[cfg(feature = "extra")]
+    RaspiCam(CameraConfig),
 
     //ioc_devices
     #[cfg(feature = "devices")]
-    Pca9685(Pca9685DeviceConfig)
+    Pca9685(Pca9685DeviceConfig),
+    #[cfg(feature = "devices")]
+    Bmp180(Bmp180DeviceConfig),
 }
 
 impl IocModuleConfig {
@@ -50,10 +57,18 @@ impl IocModuleConfig {
             Self::Noise(noise_config) => {
                 NoiseInput::try_build(&noise_config).await.map(|noise| noise.into())
             }
+            #[cfg(feature = "extra")]
+            Self::RaspiCam(cam_config) => {
+                Camera::try_build(cam_config).await.map(|cam| cam.into())
+            }
 
             #[cfg(feature = "devices")]
             Self::Pca9685(pca9685_config) => {
                 Pca9685DeviceBuilder::new(i2c_bus_provider).try_build(pca9685_config).await.map(|outputs| outputs.into())
+            }
+            #[cfg(feature = "devices")]
+            Self::Bmp180(bmp180_config) => {
+                Bmp180DeviceBuilder::new(i2c_bus_provider).try_build(bmp180_config).await.map(|sensor| sensor.into())
             }
         }
     }

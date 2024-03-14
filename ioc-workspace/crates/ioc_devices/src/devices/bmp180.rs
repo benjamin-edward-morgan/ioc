@@ -1,13 +1,13 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use embedded_hal::i2c;
-use tokio::{sync::broadcast, time::sleep};
-use tracing::{error, info, warn};
+use ioc_core::{error::IocBuildError, InputKind, ModuleBuilder, ModuleIO};
+use serde::Deserialize;
+use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tracing::error;
 use super::ScalerInput;
 
-use crate::error::DeviceConfigError;
-
-#[derive(Clone, Copy)]
+#[derive(Deserialize, Clone, Copy, Debug)]
 pub enum PressurePrecision {
     UltraLowPower,
     Standard,
@@ -15,6 +15,7 @@ pub enum PressurePrecision {
     UltraHighResolution,
 }
 
+#[derive(Deserialize, Debug)]
 pub struct Bmp180DeviceConfig {
     pressure_precision: PressurePrecision,
     period_ms: u64,
@@ -30,8 +31,53 @@ impl Default for Bmp180DeviceConfig {
 }
 
 pub struct Bmp180Device {
+    pub join_handle: JoinHandle<()>,
     pub temperature_c: ScalerInput,
     pub pressure_h_pa: ScalerInput,
+}
+
+impl From<Bmp180Device> for ModuleIO {
+    fn from(dev: Bmp180Device) -> Self {
+        ModuleIO{
+            join_handle: dev.join_handle,
+            inputs: HashMap::from([
+                ("temperature_c".to_owned(), InputKind::float(dev.temperature_c)),
+                ("pressure_h_pa".to_owned(), InputKind::float(dev.pressure_h_pa)),
+            ]),
+            outputs: HashMap::new(),
+        }
+    }
+}
+
+pub struct Bmp180DeviceBuilder<I2C, F>
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    i2c_bus_provider: F,
+}
+
+impl <I2C, F> Bmp180DeviceBuilder<I2C, F>
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    pub fn new(i2c_bus_provider: F) -> Self {
+        Bmp180DeviceBuilder { i2c_bus_provider }
+    }
+}
+
+impl <I2C, F> ModuleBuilder for Bmp180DeviceBuilder<I2C, F> 
+where 
+    I2C: i2c::I2c + Send + 'static,
+    F: Fn(u8) -> I2C,
+{
+    type Config = Bmp180DeviceConfig;
+    type Module = Bmp180Device;
+
+    async fn try_build(&self, cfg: &Bmp180DeviceConfig) -> Result<Bmp180Device, IocBuildError> {
+        Bmp180Device::build(cfg, (self.i2c_bus_provider)(1))
+    }
 }
 
 const I2C_ADDRESS: u8 = 0x77;
@@ -66,7 +112,7 @@ struct Bmp180CalibrationData {
     ac6: u16,
     b1: i16,
     b2: i16,
-    mb: i16,
+    _mb: i16,
     mc: i16,
     md: i16,
 }
@@ -77,9 +123,9 @@ struct TempResult {
 }
 
 impl Bmp180CalibrationData {
-    fn from_bytes(bytes: &[u8]) -> Result<Self, DeviceConfigError>{
+    fn from_bytes(bytes: &[u8]) -> Result<Self, IocBuildError>{
         if bytes.len() != 22 {
-            Err(DeviceConfigError::from_str("Bmp180 Calibration expected 22 bytes of calibration data."))
+            Err(IocBuildError::message("Bmp180 Calibration expected 22 bytes of calibration data."))
         } else {
             let calib_data = Bmp180CalibrationData{
                 ac1: ((bytes[0] as i16) << 8) | (bytes[1] as i16),
@@ -90,7 +136,7 @@ impl Bmp180CalibrationData {
                 ac6: ((bytes[10] as u16) << 8) | (bytes[11] as u16),
                 b1: ((bytes[12] as i16) << 8) | (bytes[13] as i16),
                 b2: ((bytes[14] as i16) << 8) | (bytes[15] as i16),
-                mb: ((bytes[16] as i16) << 8) | (bytes[17] as i16),
+                _mb: ((bytes[16] as i16) << 8) | (bytes[17] as i16),
                 mc: ((bytes[18] as i16) << 8) | (bytes[19] as i16),
                 md: ((bytes[20] as i16) << 8) | (bytes[21] as i16),   
             };
@@ -148,7 +194,7 @@ fn spawn_sensor_read_task<I2C>(
     calib: Bmp180CalibrationData, 
     pressure_precision: PressurePrecision,
     period_ms: u64,
-) 
+) -> JoinHandle<()>
 where
     I2C: i2c::I2c + Send + 'static,
 {
@@ -168,7 +214,6 @@ where
             let ut = ((buffer[0] as i32) << 8) | (buffer[1] as i32);
 
             let temp_res = calib.calc_temperature_c(ut);
-            // info!("ut: {}, temp: {}", ut, temp_res.temp_c);
             if let Err(err) = temp_tx.send(temp_res.temp_c) {
                 error!("error sending temperature data. shutting down bmp180 task. {:?}", err);
                 break;
@@ -191,7 +236,6 @@ where
             }
             
             let press = calib.calc_pressure_h_pa(temp_res.b5, oss, up);
-            //info!("up: {}, pressure: {}", up, press);
             if let Err(err) = press_tx.send(press) {
                 error!("error sending pressure data. shutting down bmp180 task. {:?}", err);
                 break;
@@ -200,34 +244,34 @@ where
             let delay: tokio::time::Sleep = sleep(Duration::from_millis(period_ms));
             delay.await;
         }  
-    });
+    })
 }
 
 impl Bmp180Device {
 
-    pub fn build<I2C>(config: &Bmp180DeviceConfig, mut i2c: I2C) -> Result<Self, DeviceConfigError>
+    pub fn build<I2C>(config: &Bmp180DeviceConfig, mut i2c: I2C) -> Result<Self, IocBuildError>
     where
         I2C: i2c::I2c + Send + 'static,
     {
 
         let mut buffer = [0u8];
         if let Err(err) = i2c.write_read(I2C_ADDRESS, &[ID_REGISTER], &mut buffer) {
-            Err(DeviceConfigError::new(format!("Got error reading ID regsiter for BMP180 Pressure sensor. {:?}", err)))
+            Err(IocBuildError::from_string(format!("Got error reading ID regsiter for BMP180 Pressure sensor. {:?}", err)))
         } else if buffer[0] != ID_EXPECTED_VALUE {
-            Err(DeviceConfigError::new(format!("Expected to get {} when reading id register from BMP180 pressure sensor, but got a different value. There may be a different device connected.", ID_EXPECTED_VALUE)))
+            Err(IocBuildError::from_string(format!("Expected to get {} when reading id register from BMP180 pressure sensor, but got a different value. There may be a different device connected.", ID_EXPECTED_VALUE)))
         } else {
             //read calibration data
             let mut buffer = [0u8 ; 22];
             i2c.write_read(I2C_ADDRESS, &[AC1_MSB_REGISTER], &mut buffer).unwrap();
             let calib = Bmp180CalibrationData::from_bytes(&buffer)?;
-            // info!("calibration data!: {:?}", calib);
 
             let (temp_tx, temp_rx) = broadcast::channel(10);
             let (press_tx, press_rx) = broadcast::channel(10);
 
-            spawn_sensor_read_task(temp_tx, press_tx, i2c, calib, config.pressure_precision, config.period_ms);
+            let join_handle = spawn_sensor_read_task(temp_tx, press_tx, i2c, calib, config.pressure_precision, config.period_ms);
 
             Ok(Self {
+                join_handle,
                 temperature_c: ScalerInput::new(temp_rx),
                 pressure_h_pa: ScalerInput::new(press_rx),
             })

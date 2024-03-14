@@ -36,6 +36,9 @@ pub enum WsInputStateInitial {
         value: String,
         max_length: u32,
     },
+    Binary {
+        value: Vec<u8>,
+    }
 }
 
 impl From<ServerInputState> for WsInputStateInitial {
@@ -47,6 +50,8 @@ impl From<ServerInputState> for WsInputStateInitial {
                 WsInputStateInitial::Bool{value},
             ServerInputState::String{value, max_length} => 
                 WsInputStateInitial::String{value, max_length},     
+            ServerInputState::Binary { value } => 
+                WsInputStateInitial::Binary{ value },
         }
     }
 }
@@ -56,6 +61,7 @@ pub enum WsOutputStateInitial {
     Float { value: Option<f64> },
     Bool { value: Option<bool> },
     String { value: Option<String> },
+    Binary { value: Option<Vec<u8>> },
 }
 
 impl From<ServerOutputState> for WsOutputStateInitial {
@@ -66,7 +72,9 @@ impl From<ServerOutputState> for WsOutputStateInitial {
             ServerOutputState::Bool{ value } => 
                 WsOutputStateInitial::Bool{ value },
             ServerOutputState::String{ value } => 
-                WsOutputStateInitial::String{ value },      
+                WsOutputStateInitial::String{ value },    
+            ServerOutputState::Binary { value } => 
+                WsOutputStateInitial::Binary{ value },  
         }
     }
 }
@@ -106,6 +114,7 @@ pub enum WsStateUpdate {
     Bool { value: bool },
     Float { value: f64 },
     String { value: String },
+    Binary { value: Vec<u8> },
 }
 
 impl From<WsStateUpdate> for ServerInputState {
@@ -114,6 +123,7 @@ impl From<WsStateUpdate> for ServerInputState {
             WsStateUpdate::Float{ value } => ServerInputState::Float{ value, min: 0.0, max: 0.0, step: 0.0 },
             WsStateUpdate::Bool{ value } => ServerInputState::Bool{ value },
             WsStateUpdate::String{ value } => ServerInputState::String{ value, max_length: 0 },
+            WsStateUpdate::Binary { value } => ServerInputState::Binary{ value },
         }
     }
 }
@@ -127,6 +137,8 @@ impl From<ServerInputState> for WsStateUpdate {
                 WsStateUpdate::Bool{ value },
             ServerInputState::String{ value, .. } => 
                 WsStateUpdate::String{ value },
+            ServerInputState::Binary { value } => 
+                WsStateUpdate::Binary { value },
         }
     }
 }
@@ -149,6 +161,11 @@ impl From<ServerOutputState> for Option<WsStateUpdate> {
                     WsStateUpdate::String{ value: value.to_string() }
                 })
             },
+            ServerOutputState::Binary { value } => {
+                value.map(|value| {
+                    WsStateUpdate::Binary{ value }
+                })
+            }
         }
     }
 }

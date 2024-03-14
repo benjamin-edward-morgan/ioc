@@ -28,8 +28,8 @@ impl Endpoint {
                 let static_endpoint = StaticDirEndpoint::new( directory );
                 Endpoint::Static(static_endpoint)
             },
-            EndpointConfig::Mjpeg { frames_output } => {
-                let mjpeg_endpoint = todo!(); //MjpegStreamEndpoint{ frames_output };
+            EndpointConfig::Mjpeg { output } => {
+                let mjpeg_endpoint = MjpegStreamEndpoint::new(cmd_tx, output);
                 Endpoint::MjpegStream(mjpeg_endpoint)
             }
         }
