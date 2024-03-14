@@ -9,7 +9,7 @@ use axum::{
 use futures_util::{Stream, StreamExt};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio_stream::wrappers::WatchStream;
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::server::state::{ServerOutputState, StateCmd};
 
@@ -35,15 +35,8 @@ impl MjpegStreamEndpoint {
             let mut subs = callback_rx.await.expect("did not get video state subscription");
 
             while let Ok(update) = subs.update_rx.recv().await {
-                if let Some(frame) = update.outputs.get(&output) {
-                    match frame {
-                        ServerOutputState::Binary { value } => {
-                            if let Some(frame) = value {
-                                frames_tx.send(frame.clone()).expect("could not send frame to watch")
-                            }
-                        },
-                        _ => {}
-                    }
+                if let Some(ServerOutputState::Binary { value: Some(frame) }) = update.outputs.get(&output) {
+                    frames_tx.send(frame.clone()).expect("could not send frame to watch")
                 }
             }
             warn!("mjpeg stream task shutting down!");

@@ -10,7 +10,7 @@ use crate::server::state::{Subscription,StateCmd};
 use super::message::{WsInitialMessage,WsStateUpdate,WsUpdateMessage};
 
 pub(crate) struct WebSocketConnection {
-    handle: JoinHandle<()>
+    _handle: JoinHandle<()>
 }
 
 impl WebSocketConnection {
@@ -67,7 +67,7 @@ impl WebSocketConnection {
                 });
         
                 WebSocketConnection{
-                    handle
+                    _handle: handle
                 }
             },
             Err(err) => {

@@ -67,7 +67,8 @@ impl Pca9685Device {
         let mut channels = HashMap::with_capacity(config.channels.len());
         let mut join_handles: Vec<JoinHandle<()>> = Vec::with_capacity(config.channels.len());
         for (k, c) in &config.channels {
-            let output = Pca9685PwmOutput::try_build(device.clone(), *c)?;
+            let (output, join_handle) = Pca9685PwmOutput::try_build(device.clone(), *c)?;
+            join_handles.push(join_handle);
             channels.insert(k.to_string(), output);
         }
 
@@ -134,7 +135,7 @@ pub struct Pca9685PwmOutput {
 }
 
 impl Pca9685PwmOutput {
-    fn try_build<I2C, E>(device: Arc<Mutex<Pca9685<I2C>>>, channel: u8) -> Result<Self, DeviceConfigError>
+    fn try_build<I2C, E>(device: Arc<Mutex<Pca9685<I2C>>>, channel: u8) -> Result<(Self, JoinHandle<()>), DeviceConfigError>
         where
             E: std::fmt::Debug,
             I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
@@ -144,7 +145,7 @@ impl Pca9685PwmOutput {
             .map_err(|_| DeviceConfigError::new(format!("Invalid channel for PCA9685 {}", channel)))?;
         
         let device = device.clone();
-        tokio::spawn(async move {
+        let join_handle = tokio::spawn(async move {
             while let Some(new_value) = rx.recv().await { 
                 // info!("new val: {}", new_value);
                 let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
@@ -159,7 +160,7 @@ impl Pca9685PwmOutput {
             info!("Pca9685PwmOutput for channel {} shutting down.", channel);
         });
 
-        Ok(Self { tx, })
+        Ok((Self { tx, }, join_handle))
     }
 }
 

@@ -25,18 +25,10 @@ modules:
           Float: { start: 0.5, min: 0, max: 1, step: 0.1 }
         taillights:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
-        enable_camera:
-          Bool: { start: true }
       outputs:
-        accel_x: Float
-        accel_y: Float
-        accel_z: Float
-        mag_x: Float
-        mag_y: Float
-        mag_z: Float
-        gyro_x: Float
-        gyro_y: Float
-        gyro_z: Float
+        gyroscope: Array
+        magnetometer: Array
+        accelerometer: Array
         temperature: Float 
         pressure: Float 
         jpeg_frames: Binary
@@ -46,8 +38,8 @@ modules:
             directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera ]
-            outputs: [ accel_x, accel_y, accel_z, mag_x, mag_y, mag_z, gyro_x, gyro_y, gyro_z, temperature, pressure ]
+            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights ]
+            outputs: [ gyroscope, magnetometer, accelerometer, temperature, pressure ]
         "/stream":
           Mjpeg:
             output: jpeg_frames
@@ -74,6 +66,13 @@ modules:
     Bmp180:
       pressure_precision: Standard
       period_ms: 1000
+
+  gyro:
+    L3dg20:
+      i2c_address: 0x6B
+
+  mag_accel:
+    Lsm303dlhc: {}
 
 
 
@@ -130,5 +129,8 @@ pipes:
   - { from: press_temp.temperature_c, to: local_server.temperature }
   - { from: press_temp.pressure_h_pa, to: local_server.pressure }
 
-  - { from: local_server.enable_camera, to: camera.enabled }
+  - { from: gyro.value, to: local_server.gyroscope }
+  - { from: mag_accel.magnetometer, to: local_server.magnetometer }
+  - { from: mag_accel.accelerometer, to: local_server.accelerometer }
+
   - { from: camera.mjpeg, to: local_server.jpeg_frames }

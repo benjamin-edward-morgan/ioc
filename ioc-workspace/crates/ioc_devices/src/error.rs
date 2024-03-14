@@ -7,7 +7,7 @@ pub struct DeviceConfigError {
 
 
 impl DeviceConfigError {
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         Self{
             message: s.to_string()
         }

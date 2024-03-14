@@ -1,6 +1,7 @@
 use crate::{ServerInputConfig, ServerOutputConfig};
 use std::collections::{HashMap,HashSet};
 use ioc_core::error::IocBuildError;
+use ioc_core::Value;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{info,error};
@@ -23,6 +24,9 @@ pub(crate) enum ServerInputState {
     },
     Binary {
         value: Vec<u8>,
+    },
+    Array {
+        value: Vec<f64>,
     }
 }
 
@@ -32,6 +36,7 @@ pub(crate) enum ServerOutputState {
     Bool { value: Option<bool> },
     String { value: Option<String> },
     Binary { value: Option<Vec<u8>> },
+    Array { value: Option<Vec<Value>> },
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +77,7 @@ impl From<&ServerOutputConfig> for ServerOutputState {
             ServerOutputConfig::Bool => ServerOutputState::Bool{ value: None},
             ServerOutputConfig::String => ServerOutputState::String{ value: None},     
             ServerOutputConfig::Binary => ServerOutputState::Binary { value: None },
+            ServerOutputConfig::Array => ServerOutputState::Array { value: None },
         }
     }
 }
@@ -171,6 +177,12 @@ impl ServerState {
                                             inputs.insert(k, ServerInputState::Binary { value: updated_binary_value });
                                         }
                                     },
+                                    (ServerInputState::Array { value: updated_array_value }, ServerInputState::Array { value: current_array_value }) => {
+                                        if *current_array_value != updated_array_value {
+                                            *current_array_value = updated_array_value.clone();
+                                            inputs.insert(k, ServerInputState::Array { value: updated_array_value });
+                                        }
+                                    },
                                     (_, _) => panic!("nope!"),
                                 }
                             }
@@ -195,6 +207,10 @@ impl ServerState {
                                         *current_binary_value = updated_binary_value.clone();
                                         outputs.insert(k, ServerOutputState::Binary { value: updated_binary_value });
                                     },
+                                    (ServerOutputState::Array { value: updated_array_value }, ServerOutputState::Array { value: current_array_value }) => {
+                                        *current_array_value = updated_array_value.clone();
+                                        outputs.insert(k, ServerOutputState::Array { value: updated_array_value });
+                                    }
                                     (_, _) => panic!("nope!"),
                                 }
                             }

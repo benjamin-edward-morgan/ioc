@@ -10,7 +10,7 @@ import Chart from './components/Chart';
 
 function App() {
 
-  const websocketUrl = "ws://" + window.location.host + "/ws";
+  const websocketUrl = "ws://" + window.location.host + "/debug";
 
   const [ioc, setter] = useIocWebsocketClient(websocketUrl);
 

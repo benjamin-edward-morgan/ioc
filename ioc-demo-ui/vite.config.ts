@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/ws': {
+      '/debug': {
         target: 'ws://localhost:8080',
         ws: true,
       }

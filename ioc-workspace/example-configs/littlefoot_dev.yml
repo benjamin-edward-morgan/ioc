@@ -24,18 +24,10 @@ modules:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
         taillights:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
-        enable_camera:
-          Bool: { start: true }
       outputs:
-        accel_x: Float
-        accel_y: Float
-        accel_z: Float
-        mag_x: Float
-        mag_y: Float
-        mag_z: Float
-        gyro_x: Float
-        gyro_y: Float
-        gyro_z: Float
+        gyroscope: Array
+        magnetometer: Array
+        accelerometer: Array
         temperature: Float 
         pressure: Float 
 
@@ -57,8 +49,8 @@ modules:
             directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera ]
-            outputs: [ accel_x, accel_y, accel_z, mag_x, mag_y, mag_z, gyro_x, gyro_y, gyro_z, temperature, pressure ]
+            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights ]
+            outputs: [ accelerometer, magnetometer, gyroscope, temperature, pressure ]
         "/debug":
           WebSocket:
             inputs: [ ]
@@ -92,13 +84,13 @@ transformers:
   tilt_servo: 
     LinearTransform:
       input: tilt_sum.value 
-      from: [0, 1]
+      from: [-1, 1]
       to: [0.05, 0.15]
   
   pan_servo: 
     LinearTransform:
       input: pan_sum.value
-      from: [0, 1]
+      from: [-1, 1]
       to: [0.05, 0.15]
 
   drive_hbridge:
