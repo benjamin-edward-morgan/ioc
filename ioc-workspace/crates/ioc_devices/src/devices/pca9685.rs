@@ -119,7 +119,7 @@ where
     type Module = Pca9685Device; 
 
     async fn try_build(&self, cfg: &Pca9685DeviceConfig) -> Result<Pca9685Device, IocBuildError> {
-        let i2c = (self.i2c_bus_provider)(0);
+        let i2c = (self.i2c_bus_provider)(1);
         let dev = Pca9685Device::build(cfg, i2c)?;
         Ok(dev)
     }

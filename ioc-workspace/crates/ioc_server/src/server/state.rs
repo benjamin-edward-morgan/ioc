@@ -21,6 +21,9 @@ pub(crate) enum ServerInputState {
         value: String,
         max_length: u32,
     },
+    Binary {
+        value: Vec<u8>,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +31,7 @@ pub(crate) enum ServerOutputState {
     Float { value: Option<f64> },
     Bool { value: Option<bool> },
     String { value: Option<String> },
+    Binary { value: Option<Vec<u8>> },
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +71,7 @@ impl From<&ServerOutputConfig> for ServerOutputState {
             ServerOutputConfig::Float => ServerOutputState::Float{ value: None},
             ServerOutputConfig::Bool => ServerOutputState::Bool{ value: None},
             ServerOutputConfig::String => ServerOutputState::String{ value: None},     
+            ServerOutputConfig::Binary => ServerOutputState::Binary { value: None },
         }
     }
 }
@@ -160,6 +165,12 @@ impl ServerState {
                                             inputs.insert(k, ServerInputState::String{ value: updated_string_value, max_length: *max_length });
                                         }
                                     },
+                                    (ServerInputState::Binary { value: updated_binary_value, .. }, ServerInputState::Binary { value: current_binary_value }) => {
+                                        if *current_binary_value != updated_binary_value {
+                                            *current_binary_value = updated_binary_value.clone();
+                                            inputs.insert(k, ServerInputState::Binary { value: updated_binary_value });
+                                        }
+                                    },
                                     (_, _) => panic!("nope!"),
                                 }
                             }
@@ -179,6 +190,10 @@ impl ServerState {
                                     (ServerOutputState::String{ value: updated_string_value }, ServerOutputState::String{ value: current_string_value }) => {
                                         *current_string_value = updated_string_value.clone();
                                         outputs.insert(k, ServerOutputState::String{ value: updated_string_value });
+                                    },
+                                    (ServerOutputState::Binary { value: updated_binary_value }, ServerOutputState::Binary { value: current_binary_value }) => {
+                                        *current_binary_value = updated_binary_value.clone();
+                                        outputs.insert(k, ServerOutputState::Binary { value: updated_binary_value });
                                     },
                                     (_, _) => panic!("nope!"),
                                 }

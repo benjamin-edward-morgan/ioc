@@ -43,6 +43,7 @@ pub enum ServerOutputConfig {
     Float,
     Bool,
     String,
+    Binary,
 }
 
 #[derive(Deserialize, Debug)]
@@ -55,8 +56,8 @@ pub enum EndpointConfig {
         directory: String,
     },
     Mjpeg {
-        frames_output: String,
-    }
+        output: String,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -82,6 +83,7 @@ pub enum TypedOutput {
     Float(ServerOutput<f64>),
     Bool(ServerOutput<bool>),
     String(ServerOutput<String>),
+    Binary(ServerOutput<Vec<u8>>),
 }
 
 pub struct Server {
@@ -108,7 +110,7 @@ impl From<Server> for ModuleIO {
                 TypedOutput::String(str) => OutputKind::String(Box::new(str)),
                 TypedOutput::Float(float) => OutputKind::Float(Box::new(float)),
                 TypedOutput::Bool(bool) => OutputKind::Bool(Box::new(bool)),
-                
+                TypedOutput::Binary(binary) => OutputKind::Binary(Box::new(binary)),     
             };
             outputs.insert(k, ok);
         }

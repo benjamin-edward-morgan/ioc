@@ -1,9 +1,20 @@
 use std::sync::{Arc, Mutex};
 
-use ioc_core::{Input, InputSource};
-use tokio::sync::broadcast;
+use ioc_core::{Input, InputSource, Output, OutputSink};
+use tokio::sync::{broadcast, mpsc};
 
 pub mod noise;
+
+
+pub struct SimpleOutput<T> {
+    pub tx: mpsc::Sender<T>
+}
+
+impl <T> Output<T> for SimpleOutput<T> {
+    fn sink(&self) -> OutputSink<T> {
+        OutputSink { tx: self.tx.clone() }
+    }
+}
 
 
 pub struct SimpleInput<T: Clone> {
