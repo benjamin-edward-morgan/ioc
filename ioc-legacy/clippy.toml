@@ -1,5 +1,0 @@
-msrv = "1.70.0"
-
-disallowed-macros = [
-    'std::unimplemented',
-]
