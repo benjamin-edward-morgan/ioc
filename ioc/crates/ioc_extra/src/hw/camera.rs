@@ -4,20 +4,17 @@ mod jpeg_stream_splitter;
 
 use crate::input::{SimpleInput, SimpleOutput};
 use child_process_stream::start_child_process;
-use futures::Future;
-use image::TestPatternGenerator;
 use ioc_core::{
-    error::IocBuildError, Input, InputKind, Module, ModuleBuilder, ModuleIO, OutputKind,
+    error::IocBuildError, InputKind, Module, ModuleIO, OutputKind,
 };
 use jpeg_stream_splitter::split_jpegs;
 use serde::Deserialize;
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, watch},
+    sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::warn;
 
 use self::{child_process_stream::ChildProcessError, image::JpegImage};
 
@@ -162,7 +159,7 @@ impl Module for Camera {
     type Config = CameraConfig;
 
     async fn try_build(_cfg: &CameraConfig) -> Result<Self, IocBuildError> {
-        let (enable_tx, enable_rx) = mpsc::channel(10);
+        let (enable_tx, _enable_rx) = mpsc::channel(10);
         let enable = SimpleOutput { tx: enable_tx };
 
         let (frame_tx, frame_rx) = broadcast::channel(1);

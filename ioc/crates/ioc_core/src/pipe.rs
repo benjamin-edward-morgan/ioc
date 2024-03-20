@@ -28,7 +28,7 @@ impl Pipe {
                     }
                     Err(err) => {
                         error!("Pipe error receiving from source: {}", err);
-                        break;
+                        // break;
                     }
                 }
             }

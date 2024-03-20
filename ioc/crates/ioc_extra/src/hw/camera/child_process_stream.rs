@@ -1,4 +1,3 @@
-use futures::Future;
 use std::process::Stdio;
 use tokio::process::{ChildStdout, Command};
 use tracing::{error, info};

@@ -1,0 +1,38 @@
+metadata:
+  name: littlefoot
+  description: demo where magnetometer heading controls steering
+
+# modules expose inputs and outputs from various sources
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs:
+        target: 
+          Float: { start: 0.0, min: -10.0, max: 10.0, step: 0.01 }
+      outputs:
+        x: Float
+      endpoints:
+        "/ws":
+          WebSocket: 
+            inputs: [ target ]
+            outputs: [ x ]
+ 
+# transformers read from one or more inputs and produce one or more new inputs
+transformers:
+
+  limiter:
+    Limiter:
+      input: local_server.target
+      min: -10
+      max: 10
+      vmin: -200
+      vmax: 200
+      amin: -50
+      amax: 50
+      period_ms: 25
+
+# pipes read from inputs and write to outputs
+pipes:
+  - { from: limiter.value, to: local_server.x}
