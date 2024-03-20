@@ -14,28 +14,50 @@ modules:
           Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
         d: 
           Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
-        heading: 
-          Float: { start: 0.0, min: -3.14, max: 3.14, step: 0.0001}
-        heading_target: 
-          Float: { start: 0.0, min: -3.14, max: 3.14, step: 0.0001}
+        set_point: 
+          Float: { start: 0.0, min: -10.0, max: 10.0, step: 0.01}
       outputs:
-        steer: Float
+        process_var: Float
       endpoints: 
         "/ws":
           WebSocket: 
-            inputs: [ p, i, d, heading, heading_target ]
-            outputs: [ steer ]
-  
+            inputs: [ p, i, d, set_point ]
+            outputs: [ process_var ]
+
+  feedback:
+    Feedback:
+      items:
+        process_var: 
+          Float:
+            start: 0.0
+
 transformers:
+
+  avg:
+    WindowAverage:
+      input: feedback.process_var
+      period_ms: 50
+
   pid:
     PID:
       p: local_server.p
       i: local_server.i
       d: local_server.d
-      set_point: local_server.heading_target 
-      process_var: local_server.heading
+      set_point: local_server.set_point 
+      process_var: avg.value
       period_ms: 100 
 
+  limiter:
+    Limiter:
+      input: pid.value
+      min: -10
+      max: 10
+      vmin: -200
+      vmax: 200
+      amin: -50
+      amax: 50
+      period_ms: 25
 
 pipes:
-  - { from: pid.value, to: local_server.steer }
+  - { from: limiter.value, to: local_server.process_var }
+  - { from: limiter.value, to: feedback.process_var }

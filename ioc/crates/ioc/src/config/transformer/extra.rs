@@ -112,7 +112,7 @@ impl TransformerConfig for LinearTransformerConfig {
 }
 
 
-
+///Clamps the input Float to the min and max, inclusive. Emits an inputs called 'value'
 #[derive(Debug,Deserialize)]
 pub struct ClampConfig {
     pub input: String,
@@ -163,7 +163,7 @@ impl TransformerConfig for ClampConfig {
     }
 }
 
-
+///Consumes an Array input, expected to be a 3-vector. Drops the z axis and computes atan2(y,x) and emits an input named 'value'
 #[derive(Debug,Deserialize)]
 pub struct HeadingConfig {
     pub input: String,
@@ -213,6 +213,12 @@ impl TransformerConfig for HeadingConfig {
     }
 }
 
+///Configuration for a tunable PID controller. 
+/// p, i, and d are inputs for the P, I, and D coefficients respectively. Integrals and derivatives are calculated numerically.
+/// set_point is the desired state
+/// process_var is the observed state
+/// period_ms is the number of milliseconds between frames
+/// emits an input named 'value' which is the control signal.
 #[derive(Debug,Deserialize)]
 pub struct PidCtrlConfig {
     p: String,
@@ -334,6 +340,11 @@ impl TransformerConfig for PidCtrlConfig {
     }
 }
 
+///Keeps an internal 'position' var and moves it with limited velocity and acceleration to the input.
+/// min/max are the range of the output
+/// vmin/vmax are limits on the velocity in units/sec. Must have vmin < 0 and vmax > 0
+/// amin/amax are the acceleration values used to move. Must have amin < 0 and amax > 0
+/// emits an input named 'value' every period_ms milliseconds
 #[derive(Debug, Deserialize)]
 pub struct LimiterConfig {
     input: String,
@@ -345,7 +356,6 @@ pub struct LimiterConfig {
     max: f64,
     period_ms: u16,
 }
-
 
 impl TransformerConfig for LimiterConfig {
     async fn try_build(
@@ -393,14 +403,12 @@ impl TransformerConfig for LimiterConfig {
     }
 }
 
-
-
+///This takes fast-changing input Float value, calculates its average using reimann sums over windows period_ms milliseconds and emits those average values.
 #[derive(Debug, Deserialize)]
 pub struct WindowAverageConfig {
     input: String,
     period_ms: u64,
 }
-
 
 impl TransformerConfig for WindowAverageConfig {
     async fn try_build(
