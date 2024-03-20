@@ -9,6 +9,7 @@ use ioc_core::{
 
 use serde::Deserialize;
 
+///Creates a transformer that reads Float values from any number of inputs, emits an input named 'value' which is their sum. 
 #[derive(Deserialize, Debug)]
 pub struct SumTransformerConfig {
     pub inputs: Vec<String>,

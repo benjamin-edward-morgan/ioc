@@ -1,8 +1,8 @@
 # ioc
-input. output. control. This is a simple framework for building robots and remotely operated devices. Inputs could be sensors or directly supplied from a user interface. Outputs could be actuators or status indicators. Controllers can consume from any number of inputs and write to any number of outputs. A configuration file dictates how these are connected together in a running system. 
+input. output. control. This is a simple framework for building robots and remotely operated devices. Inputs could be sensors or directly supplied from a user interface. Outputs could be actuators or status indicators. Transformers consume inputs and create new inputs. A configuration file describes a graph that dictates how these elements are connected together in a running system. 
 
 #### Status
-This project is a work-in-progress and under active development. Please get in touch if you are interested in contributing!
+This project is a work-in-progress and under active development. Please get in touch if you are interested in contributing! I will also probably rename this at some point, since IOC as already taken on crates.io
 
 #### Demo
 You can build and run the demo in [Docker](https://www.docker.com) without installing other tools. This will take several minutes to build on the first run. Add a `--build` argument to force rebuilding.
@@ -10,8 +10,6 @@ You can build and run the demo in [Docker](https://www.docker.com) without insta
 docker compose up -d
 ```
 And visit `localhost:8080` in a browser to view the demo ui. (has problems in Safari at the moment)
-
-The demo is a [damped harmonic oscilator](https://en.wikipedia.org/wiki/Harmonic_oscillator) simulation, being driven by a [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller). You can change the oscilator parameters (a, b, and c), the PID parameters (p, i, and d), and the set_point. The outputs are the position and the force applied by the controller.
 
 Clean it up with
 ```shell
@@ -23,7 +21,7 @@ See [other dev notes](NOTES.md)
 #### Subprojects
 
 ##### ioc
-This is the main ioc application, developed in Rust. It supports building for Raspberry Pi and implements simple inputs and outputs for the pi's GPIO. See the [ioc README](ioc/README.md).
+This is the main ioc application, developed in Rust. It supports building for Raspberry Pi and implements simple inputs and outputs for the pi's GPIO, as well as a small set of other devices. See the [ioc README](ioc/README.md).
 
 ##### ioc-demo-ui
 This is a demo web UI for interacting with ioc's websocket server (if enabled). When the websocket server is enabled, input values can be directly manipulated by a user in real time. Output values are also emitted on the websocket in real time. See the [ioc-demo-ui README](ioc-demo-ui/README.md).

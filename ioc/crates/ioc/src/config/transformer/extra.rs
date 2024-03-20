@@ -13,6 +13,10 @@ use ioc_extra::transform::{
 
 use serde::Deserialize;
 
+///Creates a transformer that consumes a Float input that is positive or negative. Emits three inputs:
+/// - forward - this is the input when it is positive, zero otherwise
+/// - reverse - this is -input when it is negative, zero otherwise
+/// - enable - this is 1.0 when input is nonzero, zero otherwize
 #[derive(Deserialize, Debug)]
 pub struct HBridgeTransformerConfig {
     input: String,
@@ -54,8 +58,12 @@ impl TransformerConfig for HBridgeTransformerConfig {
         HashSet::from([&self.input])
     }
 }
-#[derive(Deserialize, Debug)]
 
+///Emits a linear transformer that consumes from a Float input, and emits an input named 'value' 
+/// from must contain two values for the domain. from[0] must be less than from[1]
+/// to must contain two values for range. if to[0] > to[1] then there will be an inverse relationship. 
+/// If the input supplied is beyond the domain, the output emitted will be beyond the range.
+#[derive(Deserialize, Debug)]
 pub struct LinearTransformerConfig {
     input: String,
     from: Vec<f64>,

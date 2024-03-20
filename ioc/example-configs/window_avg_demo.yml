@@ -1,6 +1,6 @@
 metadata:
-  name: littlefoot
-  description: demo where magnetometer heading controls steering
+  name: window average filter
+  description: demo of window average controller
 
 # modules expose inputs and outputs from various sources
 modules:

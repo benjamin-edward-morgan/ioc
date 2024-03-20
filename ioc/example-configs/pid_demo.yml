@@ -1,6 +1,6 @@
 metadata:
-  name: littlefoot
-  description: demo where magnetometer heading controls steering
+  name: pid demo 
+  description: demo where magnetometer heading controls steering and camera pan - requires raspberry pi with devices
 
 # modules expose inputs and outputs from various sources
 modules:
@@ -15,28 +15,15 @@ modules:
           Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
         d: 
           Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
-        pan: 
-          Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
-        pan_trim: 
-          Float: { start: 0.0556640625, min: -1, max: 1, step: 0.0009765625 }
-        tilt: 
-          Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
-        tilt_trim: 
-          Float: { start: 0.67578125, min: -1, max: 1, step: 0.0009765625 }
-        headlights:
-          Float: { start: 0.5, min: 0, max: 1, step: 0.1 }
-        taillights:
-          Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
         heading_target: 
           Float: { start: 0.0, min: -3.14, max: 3.14, step: 0.0001}
       outputs:
         heading: Float
-        steer_out: Float
-      endpoints: 
+      endpoints:
         "/ws":
           WebSocket: 
-            inputs: [ heading_target, pan, tilt, pan_trim, tilt_trim, headlights, taillights, p, i, d ]
-            outputs: [ heading, steer_out ]
+            inputs: [ heading_target, p, i, d ]
+            outputs: [ heading ]
   pwm:
     Pca9685:
       i2c_bus: 0
@@ -44,8 +31,6 @@ modules:
       channels:
         pan_servo: 0
         tilt_servo: 1
-        headlights: 2
-        taillights: 3
         steer_enable: 7
         steer_left: 8
         steer_right: 9
@@ -55,29 +40,6 @@ modules:
 
 # transformers read from one or more inputs and produce one or more new inputs
 transformers:
-  pan_sum:
-    Sum:
-      inputs:
-        - local_server.pan
-        - local_server.pan_trim
-  
-  tilt_sum:
-    Sum:
-      inputs:
-        - local_server.tilt
-        - local_server.tilt_trim
-
-  tilt_servo: 
-    LinearTransform:
-      input: tilt_sum.value 
-      from: [-1, 1]
-      to: [0.05, 0.15]
-  
-  pan_servo: 
-    LinearTransform:
-      input: pan_sum.value
-      from: [-1, 1]
-      to: [0.05, 0.15]
 
   heading:
     Heading:
@@ -102,17 +64,25 @@ transformers:
     HBridge:
       input: steer_clamp.value
 
+  pan_servo:
+    LinearTransform:
+      input: steer_pid.value
+      from: [-1.57, 1.57] 
+      to: [ 0.15, 0.05 ]
+
+  pan_clamp:
+    Clamp:
+      input: pan_servo.value
+      min: 0.05
+      max: 0.15
+
 # pipes read from inputs and write to outputs
 pipes:
-  - { from: pan_servo.value, to: pwm.pan_servo }
-  - { from: tilt_servo.value, to: pwm.tilt_servo }
 
   - { from: steer_hbridge.forward, to: pwm.steer_left}
   - { from: steer_hbridge.reverse, to: pwm.steer_right }
   - { from: steer_hbridge.enable, to: pwm.steer_enable }
 
-  - { from: local_server.headlights, to: pwm.headlights }
-  - { from: local_server.taillights, to: pwm.taillights }
-
   - { from: heading.value, to: local_server.heading }
-  - { from: steer_clamp.value, to: local_server.steer_out }
+
+  - { from: pan_clamp.value, to: pwm.pan_servo }

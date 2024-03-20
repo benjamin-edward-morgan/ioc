@@ -13,12 +13,14 @@ use ioc_core::error::IocBuildError;
 use serde::Deserialize;
 use tracing::{debug, trace};
 
+///Metadata fields for an IOC configuration
 #[derive(Deserialize, Debug)]
 pub struct IocMetadataConfig {
     pub name: Option<String>,
     pub description: Option<String>,
 }
 
+///This is the struc corresponding to the root of the config file
 #[derive(Deserialize, Debug)]
 pub struct IocConfig {
     pub metadata: IocMetadataConfig,
@@ -28,6 +30,8 @@ pub struct IocConfig {
 }
 
 impl IocConfig {
+    ///Builds and runs the application, waiting for it to finish.
+    /// Returns an error if the application can't be started.
     pub async fn start(self) -> Result<(), IocBuildError> {
         let mut handles = Vec::with_capacity(128);
         let mut inputs = HashMap::with_capacity(128);
