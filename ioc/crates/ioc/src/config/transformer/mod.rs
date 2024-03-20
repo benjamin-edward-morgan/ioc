@@ -12,6 +12,7 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 
+///This trait should be implemented by all config objects
 pub trait TransformerConfig {
     fn try_build(
         &self,

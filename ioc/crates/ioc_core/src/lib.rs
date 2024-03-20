@@ -10,6 +10,7 @@ use tokio::{
 pub mod error;
 pub mod pipe;
 pub mod transformer;
+pub mod feedback;
 
 ///An input source from an IOC component. Always starts with a value and includes a receiver so the conumer can receive updated values.
 pub struct InputSource<T> {

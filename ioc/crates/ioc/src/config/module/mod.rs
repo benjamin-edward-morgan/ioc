@@ -1,4 +1,4 @@
-use ioc_core::{error::IocBuildError, Module, ModuleBuilder, ModuleIO};
+use ioc_core::{error::IocBuildError, feedback::{Feedback, FeedbackConfig}, Module, ModuleBuilder, ModuleIO};
 use serde::Deserialize;
 
 //ioc_server
@@ -33,6 +33,9 @@ fn i2c_bus_provider(bus: u8) -> I2c {
 /// Modules are collections of Inputs and/or Outputs provided by some black-box system.
 #[derive(Deserialize, Debug)]
 pub enum IocModuleConfig {
+    //core 
+    Feedback(FeedbackConfig),
+
     //ioc_server
     #[cfg(feature = "server")]
     Server(ServerConfig),
@@ -57,11 +60,18 @@ pub enum IocModuleConfig {
 impl IocModuleConfig {
     pub async fn build(&self) -> Result<ModuleIO, IocBuildError> {
         match self {
+            //core
+            Self::Feedback(feedback_config) => Feedback::try_build(feedback_config)
+            .await
+            .map(|feedback| feedback.into()),
+
+            //server
             #[cfg(feature = "server")]
             Self::Server(server_config) => Server::try_build(&server_config)
                 .await
                 .map(|server| server.into()),
 
+            //extra
             #[cfg(feature = "extra")]
             Self::Noise(noise_config) => NoiseInput::try_build(&noise_config)
                 .await
@@ -69,6 +79,7 @@ impl IocModuleConfig {
             #[cfg(feature = "extra")]
             Self::RaspiCam(cam_config) => Camera::try_build(cam_config).await.map(|cam| cam.into()),
 
+            //devices
             #[cfg(feature = "devices")]
             Self::Pca9685(pca9685_config) => Pca9685DeviceBuilder::new(i2c_bus_provider)
                 .try_build(pca9685_config)
