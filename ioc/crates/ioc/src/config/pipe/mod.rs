@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use ioc_core::{error::IocBuildError, pipe::Pipe, InputKind, OutputKind};
 use serde::Deserialize;
 
+//A Pipe is a simple object that reads values from an Input and writes them to an Output
 #[derive(Deserialize, Debug)]
 pub struct PipeConfig {
     pub from: String,

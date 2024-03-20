@@ -1,6 +1,6 @@
 metadata:
   name: littlefoot
-  description: just a remote controlled car
+  description: just a remote controlled car powered by raspberry pi
 
 # modules expose inputs and outputs from various sources
 modules:

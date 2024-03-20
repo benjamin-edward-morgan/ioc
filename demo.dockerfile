@@ -20,4 +20,4 @@ COPY --from=ui-builder /usr/ioc-demo-ui/dist assets/
 EXPOSE 8080 
 ENV RUST_LOG="ioc=debug,info"
 
-CMD ["./ioc", "pid-second-order.yml"]
+CMD ["./ioc", "littlefoot_dev.yml"]

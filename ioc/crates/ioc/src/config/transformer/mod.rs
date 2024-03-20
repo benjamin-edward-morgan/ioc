@@ -20,6 +20,7 @@ pub trait TransformerConfig {
     fn needs_inputs(&self) -> HashSet<&String>;
 }
 
+///All possible objects that could appear below the `transformers` secion in the config file.
 #[derive(Deserialize, Debug)]
 pub enum IocTransformerConfig {
     //core
@@ -43,6 +44,7 @@ pub enum IocTransformerConfig {
 }
 
 impl IocTransformerConfig {
+    //Attempts to build this transformer given a map of all named upstream inputs.
     pub async fn try_build(
         &self,
         upstream_inputs: &HashMap<String, InputKind>,
@@ -69,6 +71,7 @@ impl IocTransformerConfig {
         }
     }
 
+    //Returns the names of upstream inputs this Transformer will require to be built.
     pub fn needs_inputs(&self) -> HashSet<&String> {
         match self {
             //core

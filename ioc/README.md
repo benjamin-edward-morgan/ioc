@@ -5,7 +5,7 @@ This project was born out of a desire to learn Rust and to build a [better roboc
 ```shell
 ioc config.yml
 ```
-Where `config.yml` defines the inputs, outputs, controllers and the connectivity between them. 
+Where `config.yml` defines the inputs, outputs, transformers, and the connectivity between them. 
 
 #### Crates
 - `ioc_core` includes fundamental data types used in all other ioc libraries. 
@@ -38,6 +38,8 @@ The target will depend on the hardware model.
 | 4B, 400, 5 | aarch64-unknown-linux-gnu |
 
 #### Future Work
+- Graceful shutdown
+- Actual tests
 - Create a "wsclient" feature, analagous to the "wsserver" feature and using the same websocket protocol. One possible senario is: A remote device running ioc connects to a cloud server, also running ioc. A user can connect to the cloud server to interact with the remote device.
 - Actual authentication on those websockets. A requirement for the previous item.
 - Other possible communication protocols: protobuf, WebRTC

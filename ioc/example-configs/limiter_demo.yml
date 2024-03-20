@@ -1,6 +1,6 @@
 metadata:
-  name: littlefoot
-  description: demo where magnetometer heading controls steering
+  name: limiter demo
+  description: demo of the velocity, position limiting filter
 
 # modules expose inputs and outputs from various sources
 modules:

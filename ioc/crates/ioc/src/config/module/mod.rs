@@ -30,6 +30,7 @@ fn i2c_bus_provider(bus: u8) -> I2c {
     ioc_rpi_gpio::get_bus(bus)
 }
 
+/// Modules are collections of Inputs and/or Outputs provided by some black-box system.
 #[derive(Deserialize, Debug)]
 pub enum IocModuleConfig {
     //ioc_server
