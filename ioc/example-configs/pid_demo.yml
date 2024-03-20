@@ -1,6 +1,6 @@
 metadata:
   name: littlefoot
-  description: just a remote controlled car
+  description: demo where magnetometer heading controls steering
 
 # modules expose inputs and outputs from various sources
 modules:
@@ -9,10 +9,12 @@ modules:
       port: 8080
       root_context: /
       inputs:
-        drive:
-          Float: { start: 0.0, min: -1, max: 1, step: 0.0009765625 }
-        steer:
-          Float: { start: 0.0, min: -1, max: 1, step: 0.0009765625 }
+        p: 
+          Float: { start: 1.0, min: 0.0, max: 10.0, step: 0.01 }
+        i: 
+          Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
+        d: 
+          Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
         pan: 
           Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
         pan_trim: 
@@ -25,25 +27,16 @@ modules:
           Float: { start: 0.5, min: 0, max: 1, step: 0.1 }
         taillights:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
+        heading_target: 
+          Float: { start: 0.0, min: -3.14, max: 3.14, step: 0.0001}
       outputs:
-        gyroscope: Array
-        magnetometer: Array
-        accelerometer: Array
-        temperature: Float 
-        pressure: Float 
         heading: Float
-        jpeg_frames: Binary
+        steer_out: Float
       endpoints: 
-        "/": 
-          Static:
-            directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights ]
-            outputs: [ gyroscope, magnetometer, accelerometer, temperature, pressure, heading ]
-        "/stream":
-          Mjpeg:
-            output: jpeg_frames
+            inputs: [ heading_target, pan, tilt, pan_trim, tilt_trim, headlights, taillights, p, i, d ]
+            outputs: [ heading, steer_out ]
   pwm:
     Pca9685:
       i2c_bus: 0
@@ -53,29 +46,12 @@ modules:
         tilt_servo: 1
         headlights: 2
         taillights: 3
-        drive_enable: 4
-        drive_rev: 5
-        drive_fwd: 6
         steer_enable: 7
         steer_left: 8
         steer_right: 9
 
-  camera:
-    RaspiCam: {}
-
-  press_temp:
-    Bmp180:
-      pressure_precision: Standard
-      period_ms: 1000
-
-  gyro:
-    L3dg20:
-      i2c_address: 0x6B
-
   mag_accel:
     Lsm303dlhc: {}
-
-
 
 # transformers read from one or more inputs and produce one or more new inputs
 transformers:
@@ -103,26 +79,33 @@ transformers:
       from: [-1, 1]
       to: [0.05, 0.15]
 
-  drive_hbridge:
-    HBridge:
-      input: local_server.drive 
-  
-  steer_hbridge:
-    HBridge:
-      input: local_server.steer
-
   heading:
     Heading:
       input: mag_accel.magnetometer
+
+  steer_pid:
+    PID:
+      p: local_server.p
+      i: local_server.i
+      d: local_server.d 
+      set_point: local_server.heading_target
+      process_var: heading.value
+      period_ms: 100
+
+  steer_clamp:
+    Clamp:
+      min: -1.0
+      max: 1.0
+      input: steer_pid.value
+
+  steer_hbridge:
+    HBridge:
+      input: steer_clamp.value
 
 # pipes read from inputs and write to outputs
 pipes:
   - { from: pan_servo.value, to: pwm.pan_servo }
   - { from: tilt_servo.value, to: pwm.tilt_servo }
-
-  - { from: drive_hbridge.forward, to: pwm.drive_fwd }
-  - { from: drive_hbridge.reverse, to: pwm.drive_rev }
-  - { from: drive_hbridge.enable, to: pwm.drive_enable }
 
   - { from: steer_hbridge.forward, to: pwm.steer_left}
   - { from: steer_hbridge.reverse, to: pwm.steer_right }
@@ -131,13 +114,5 @@ pipes:
   - { from: local_server.headlights, to: pwm.headlights }
   - { from: local_server.taillights, to: pwm.taillights }
 
-  - { from: press_temp.temperature_c, to: local_server.temperature }
-  - { from: press_temp.pressure_h_pa, to: local_server.pressure }
-
-  - { from: gyro.value, to: local_server.gyroscope }
-  - { from: mag_accel.magnetometer, to: local_server.magnetometer }
-  - { from: mag_accel.accelerometer, to: local_server.accelerometer }
-
-  - { from: camera.mjpeg, to: local_server.jpeg_frames }
-
   - { from: heading.value, to: local_server.heading }
+  - { from: steer_clamp.value, to: local_server.steer_out }

@@ -1,6 +1,6 @@
 use crate::hw::camera::image::JpegImage;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{broadcast};
 use tracing::info;
 
 enum SplitJpegState {

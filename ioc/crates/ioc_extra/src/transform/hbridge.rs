@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
 use tokio::{sync::broadcast, task::JoinHandle};
-
+use tracing::debug;
 use crate::input::SimpleInput;
 
 pub struct HBridgeConfig<'a> {
@@ -57,6 +57,7 @@ impl<'a> Transformer<'a> for HBridge {
                 rev_tx.send(rev).expect("failed to send hbridge value");
                 en_tx.send(en).expect("failed to send hbridge value");
             }
+            debug!("hbridge shutting down!")
         });
 
         Ok(HBridge {

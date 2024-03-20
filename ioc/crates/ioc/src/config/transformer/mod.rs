@@ -4,7 +4,7 @@ pub mod core;
 pub mod extra;
 
 #[cfg(feature = "extra")]
-use extra::{HBridgeTransformerConfig, LinearTransformerConfig};
+use extra::{HBridgeTransformerConfig, LinearTransformerConfig, ClampConfig, HeadingConfig, PidCtrlConfig, LimiterConfig, WindowAverageConfig};
 
 use core::SumTransformerConfig;
 use ioc_core::{error::IocBuildError, InputKind, TransformerI};
@@ -30,6 +30,16 @@ pub enum IocTransformerConfig {
     HBridge(HBridgeTransformerConfig),
     #[cfg(feature = "extra")]
     LinearTransform(LinearTransformerConfig),
+    #[cfg(feature = "extra")]
+    Clamp(ClampConfig),
+    #[cfg(feature = "extra")]
+    Heading(HeadingConfig),
+    #[cfg(feature = "extra")]
+    PID(PidCtrlConfig),
+    #[cfg(feature = "extra")]
+    Limiter(LimiterConfig),
+    #[cfg(feature = "extra")]
+    WindowAverage(WindowAverageConfig),
 }
 
 impl IocTransformerConfig {
@@ -44,9 +54,18 @@ impl IocTransformerConfig {
             //extra
             #[cfg(feature = "extra")]
             Self::HBridge(hbridge) => hbridge.try_build(upstream_inputs).await,
-
             #[cfg(feature = "extra")]
             Self::LinearTransform(lxform) => lxform.try_build(upstream_inputs).await,
+            #[cfg(feature = "extra")]
+            Self::Clamp(clampcfg) => clampcfg.try_build(upstream_inputs).await,
+            #[cfg(feature = "extra")]
+            Self::Heading(hdgcfg) => hdgcfg.try_build(upstream_inputs).await,
+            #[cfg(feature = "extra")]
+            Self::PID(pidcfg) => pidcfg.try_build(upstream_inputs).await,
+            #[cfg(feature = "extra")]
+            Self::Limiter(limcfg) => limcfg.try_build(upstream_inputs).await,
+            #[cfg(feature = "extra")]
+            Self::WindowAverage(avgcfg) => avgcfg.try_build(upstream_inputs).await,
         }
     }
 
@@ -58,9 +77,18 @@ impl IocTransformerConfig {
             //extra
             #[cfg(feature = "extra")]
             Self::HBridge(hbridge) => hbridge.needs_inputs(),
-
             #[cfg(feature = "extra")]
             Self::LinearTransform(lxform) => lxform.needs_inputs(),
+            #[cfg(feature = "extra")]
+            Self::Clamp(clampcfg) => clampcfg.needs_inputs(),
+            #[cfg(feature = "extra")]
+            Self::Heading(hdgcfg) => hdgcfg.needs_inputs(),
+            #[cfg(feature = "extra")]
+            Self::PID(pidcfg) => pidcfg.needs_inputs(),
+            #[cfg(feature = "extra")]
+            Self::Limiter(limcfg) => limcfg.needs_inputs(),
+            #[cfg(feature = "extra")]
+            Self::WindowAverage(avgcfg) => avgcfg.needs_inputs(),
         }
     }
 }
