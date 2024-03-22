@@ -11,25 +11,20 @@ pub struct Pipe {
 
 impl Pipe {
     ///Create a new `Pipe`. Spawns a task that reads from the input and writes to the output.
-    pub fn new<T: Clone + Send + 'static>(input: &dyn Input<T>, output: &dyn Output<T>) -> Pipe {
+    pub fn new<T: Send + Sync + Copy + 'static>(input: &Input<T>, output: &Output<T>) -> Pipe {
         let mut source = input.source();
         let sink = output.sink();
 
         let handle = tokio::spawn(async move {
-            sink.tx.send(source.start).await.unwrap();
-
             loop {
-                match source.rx.recv().await {
-                    Ok(t) => {
-                        if let Err(err) = sink.tx.send(t).await {
-                            error!("Pipe error sending to sink: {}", err);
-                            break;
-                        }
-                    }
-                    Err(err) => {
-                        error!("Pipe error receiving from source: {}", err);
-                        // break;
-                    }
+                let value: T = *source.borrow_and_update();
+                if let Err(err) = sink.send(value).await {
+                    error!("Pipe error sending to sink: {}", err);
+                    return;
+                }
+                if let Err(err) = source.changed().await {
+                    error!("Pipe error receiving from source: {}", err);
+                    break;
                 }
             }
             debug!("Pipe shutting down!")
