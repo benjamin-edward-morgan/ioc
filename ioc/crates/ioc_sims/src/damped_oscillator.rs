@@ -8,6 +8,7 @@ use peroxide::{fuga::{ExMethod, NoEnv, ODE}, numerical::ode::{ExplicitODE, State
 
 use crate::{InputAverager, SimIn};
 
+///A running simulation of a damped oscillator. x gives the position, v gives the velocity
 pub struct DampedOscillator {
     pub join_handle: JoinHandle<()>,
     pub x: SimIn<f64>, //position
@@ -25,8 +26,6 @@ impl From<DampedOscillator> for TransformerI {
         }
     }
 }
-
-
 
 fn spawn_sim_task(cfg: &DampedOscillatorConfig, x_tx: broadcast::Sender<f64>, v_tx: broadcast::Sender<f64>) -> JoinHandle<()> {
     let mut m = InputAverager::new(cfg.m);
@@ -100,6 +99,35 @@ fn oscillator_fn(state: &mut State<f64>, _: &NoEnv) {
 }
 
 
+/// Configuration for a damped oscillator simulation.
+/// 
+/// mx'' + cx' + kx = f (where x' is dx/dt amd x'' is d^2x/dt^2)
+/// m, c, k and f can all vary with time.
+///
+/// This struct holds the parameters required to simulate a damped oscillator system.
+/// It specifies the mass (m), damping coefficient (c), spring constant (k), and external force (f).
+///
+/// - `m`: The mass of the oscillator. Must be greater than zero.
+/// - `c`: The damping coefficient. Must be greater than or equal to zero.
+/// - `k`: The spring constant. Must be greater than zero.
+/// - `f`: The external force applied to the oscillator.
+/// - `period_ms`: The frequency at which frames are emitted, in milliseconds.
+/// - `steps_per_frame`: The number of integration steps to take per frame.
+///
+/// # Example
+///
+/// ```
+/// use ioc_sims::DampedOscillatorConfig;
+///
+/// let config = DampedOscillatorConfig {
+///     m: &mass_input,
+///     c: &damping_input,
+///     k: &spring_constant_input,
+///     f: &external_force_input,
+///     period_ms: 10,
+///     steps_per_frame: 100,
+/// };
+/// ```
 pub struct DampedOscillatorConfig<'a> {
     pub m: &'a dyn Input<f64>, //mass - must be greater than zero
     pub c: &'a dyn Input<f64>, //damping coefficient - must be greater than or equal to zero
