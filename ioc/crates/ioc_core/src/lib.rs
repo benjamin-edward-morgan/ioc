@@ -3,7 +3,7 @@
 use error::IocBuildError;
 use std::{collections::HashMap, fmt, future::Future};
 use tokio::{
-    sync::{broadcast, mpsc},
+    sync::{mpsc, watch},
     task::JoinHandle,
 };
 
@@ -12,66 +12,53 @@ pub mod pipe;
 pub mod transformer;
 pub mod feedback;
 
-///An input source from an IOC component. Always starts with a value and includes a receiver so the conumer can receive updated values.
-pub struct InputSource<T> {
-    pub start: T,
-    pub rx: broadcast::Receiver<T>,
+pub struct Input<T>{
+    rx: watch::Receiver<T>
 }
 
-///An input value from an IOC component. Multiple `InputSource`s can be created from a single `Input`.
-///
-/// `Input`s can take any type, but must be restricted to a fundamental data type when using configuration
-pub trait Input<T> {
-    //Produces a new InputSource for this Input
-    fn source(&self) -> InputSource<T>;
+impl<T> Input<T> {
+    pub fn new(start: T) -> (Self, watch::Sender<T>) {
+        let (tx, rx) = watch::channel(start);
+        (Self { rx }, tx)
+    }
+    pub fn source(&self) -> watch::Receiver<T> {
+        self.rx.clone()
+    }
 }
 
-///An output sink to an IOC component. A producer can write values to the sender and the component receives the values.
-pub struct OutputSink<T> {
-    pub tx: mpsc::Sender<T>,
+pub struct Output<T>{
+    pub tx: mpsc::Sender<T>
 }
 
-///An output to an IOC component. Although they can be created, there should not be multiple `OutputSink`s writing to a single output.
-///
-/// `Output`s can take any type, but must be restricted to a fundamental data type when using configuration
-pub trait Output<T> {
-    fn sink(&self) -> OutputSink<T>;
+impl<T> Output<T> {
+    pub fn new() -> (Self, mpsc::Receiver<T>) {
+        let (tx, rx) = mpsc::channel(1);
+        (Self { tx }, rx)
+    }
+    pub fn sink(&self) -> mpsc::Sender<T> {
+        self.tx.clone()
+    }
 }
 
 ///Enum to hold fundamental data type values.
-///
-/// TODO: add other types this is just used for arrays at the moment
 #[derive(Debug, Clone)]
 pub enum Value {
+    String(String),
+    Binary(Vec<u8>),
     Float(f64),
+    Bool(bool),
+    Array(Vec<Value>),
+    Object(HashMap<String, Value>),
 }
 
 ///Fundamental `Input` kinds when using configuration.
 pub enum InputKind {
-    String(Box<dyn Input<String>>),
-    Binary(Box<dyn Input<Vec<u8>>>),
-    Float(Box<dyn Input<f64>>),
-    Bool(Box<dyn Input<bool>>),
-    Array(Box<dyn Input<Vec<Value>>>),
-}
-
-///Some functions to save you from writing `Box::new`
-impl InputKind {
-    pub fn float<F: Input<f64> + 'static>(f: F) -> Self {
-        Self::Float(Box::new(f))
-    }
-    pub fn binary<F: Input<Vec<u8>> + 'static>(f: F) -> Self {
-        Self::Binary(Box::new(f))
-    }
-    pub fn string<F: Input<String> + 'static>(f: F) -> Self {
-        Self::String(Box::new(f))
-    }
-    pub fn bool<F: Input<bool> + 'static>(f: F) -> Self {
-        Self::Bool(Box::new(f))
-    }
-    pub fn array<F: Input<Vec<Value>> + 'static>(f: F) -> Self {
-        Self::Array(Box::new(f))
-    }
+    String(Input<String>),
+    Binary(Input<Vec<u8>>),
+    Float(Input<f64>),
+    Bool(Input<bool>),
+    Array(Input<Vec<Value>>),
+    Object(Input<HashMap<String, Value>>),
 }
 
 impl fmt::Debug for InputKind {
@@ -82,17 +69,19 @@ impl fmt::Debug for InputKind {
             Self::Float(_) => f.write_str("Float"),
             Self::Bool(_) => f.write_str("Bool"),
             Self::Array(_) => f.write_str("Array"),
+            Self::Object(_) => f.write_str("Object")
         }
     }
 }
 
 ///Fundamental `Output` kinds when using configuration.
 pub enum OutputKind {
-    String(Box<dyn Output<String>>),
-    Binary(Box<dyn Output<Vec<u8>>>),
-    Float(Box<dyn Output<f64>>),
-    Bool(Box<dyn Output<bool>>),
-    Array(Box<dyn Output<Vec<Value>>>),
+    String(Output<String>),
+    Binary(Output<Vec<u8>>),
+    Float(Output<f64>),
+    Bool(Output<bool>),
+    Array(Output<Vec<Value>>),
+    Object(Output<HashMap<String, Value>>),
 }
 
 impl fmt::Debug for OutputKind {
@@ -103,25 +92,11 @@ impl fmt::Debug for OutputKind {
             Self::Float(_) => f.write_str("Float"),
             Self::Bool(_) => f.write_str("Bool"),
             Self::Array(_) => f.write_str("Array"),
+            Self::Object(_) => f.write_str("Object")
         }
     }
 }
 
-///some functions to save you from writing `Box::new`
-impl OutputKind {
-    pub fn float<F: Output<f64> + 'static>(f: F) -> Self {
-        Self::Float(Box::new(f))
-    }
-    pub fn binary<F: Output<Vec<u8>> + 'static>(f: F) -> Self {
-        Self::Binary(Box::new(f))
-    }
-    pub fn string<F: Output<String> + 'static>(f: F) -> Self {
-        Self::String(Box::new(f))
-    }
-    pub fn bool<F: Output<bool> + 'static>(f: F) -> Self {
-        Self::Bool(Box::new(f))
-    }
-}
 
 ///When using configuration, ModuleIO holds the inputs, outputs and a join handle provided by a `Module`.
 ///
