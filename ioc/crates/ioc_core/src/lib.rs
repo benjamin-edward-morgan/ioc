@@ -1,6 +1,7 @@
 //!This is the core library for the IOC project. All other IOC libraries depend on this one. This includes all fundamental data types required for a running IOC instance.
 
 use error::IocBuildError;
+use serde::Deserialize;
 use std::{collections::HashMap, fmt, future::Future};
 use tokio::{
     sync::{mpsc, watch},
@@ -49,6 +50,16 @@ pub enum Value {
     Bool(bool),
     Array(Vec<Value>),
     Object(HashMap<String, Value>),
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(_deserializer: D) -> Result<Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
+    }
+
 }
 
 ///Fundamental `Input` kinds when using configuration.
