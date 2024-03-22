@@ -24,7 +24,7 @@ impl <O: Clone + Send + 'static> FunctionTransformer<O> {
         let join_handle = tokio::spawn(async move {
             while let Ok(x) = in_rx.recv().await {
                 if let Err(err) = tx.send(function(x)) {
-                    error!("send error in function transformer");
+                    error!("send error in function transformer {}", err);
                     break;
                 }
             }

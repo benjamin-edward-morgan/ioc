@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
 use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
-use tracing::{debug,info};
+use tracing::{info, warn};
 use std::time::{Instant,Duration};
 use std::sync::{Arc, Mutex};
 use crate::input::SimpleInput;
@@ -84,14 +84,15 @@ fn spawn_window_avg_task(
 
     let state = Arc::new(Mutex::new(WindowAverageState::new(start)));
 
-    let mut wt_state = state.clone();
+    let wt_state = state.clone();
     let write_task = tokio::spawn(async move {
         loop{
-            let mut step = match wt_state.lock() {
+            let step = match wt_state.lock() {
                 Ok(mut state) => state.step(),
                 Err(poisoned) => poisoned.into_inner().step(),
             };
             if let Err(err) = out_tx.send(step) {
+                warn!("send error in window averager: {}", err);
                 break;
             }
             sleep(Duration::from_millis(period_ms)).await;
