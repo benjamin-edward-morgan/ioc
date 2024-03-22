@@ -5,7 +5,7 @@ use ioc_core::{error::IocBuildError, InputKind, Transformer, TransformerI, Value
 use ioc_extra::transform::{
     hbridge::{HBridge, HBridgeConfig},
     linear::{LinearTransform, LinearTransformConfig},
-    function::{FunctionTransformer},
+    function::FunctionTransformer,
     pid::{Pid, PidConfig},
     limiter::{LimiterParams, LimiterFilterConfig, Limiter},
     average::{WindowAverageFilterConfig, WindowAverage},

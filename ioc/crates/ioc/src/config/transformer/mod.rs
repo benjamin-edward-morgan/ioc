@@ -6,6 +6,12 @@ pub mod extra;
 #[cfg(feature = "extra")]
 use extra::{HBridgeTransformerConfig, LinearTransformerConfig, ClampConfig, HeadingConfig, PidCtrlConfig, LimiterConfig, WindowAverageConfig};
 
+#[cfg(feature = "sims")]
+pub mod sims;
+
+#[cfg(feature = "sims")]
+use sims::DampedOscillatorSimConfig;
+
 use core::SumTransformerConfig;
 use ioc_core::{error::IocBuildError, InputKind, TransformerI};
 use serde::Deserialize;
@@ -42,6 +48,10 @@ pub enum IocTransformerConfig {
     Limiter(LimiterConfig),
     #[cfg(feature = "extra")]
     WindowAverage(WindowAverageConfig),
+
+    //sim 
+    #[cfg(feature = "sims")]
+    DampedOscillator(DampedOscillatorSimConfig),
 }
 
 impl IocTransformerConfig {
@@ -69,6 +79,10 @@ impl IocTransformerConfig {
             Self::Limiter(limcfg) => limcfg.try_build(upstream_inputs).await,
             #[cfg(feature = "extra")]
             Self::WindowAverage(avgcfg) => avgcfg.try_build(upstream_inputs).await,
+
+            //sims
+            #[cfg(feature = "sims")]
+            Self::DampedOscillator(simcfg) => simcfg.try_build(upstream_inputs).await,
         }
     }
 
@@ -93,6 +107,10 @@ impl IocTransformerConfig {
             Self::Limiter(limcfg) => limcfg.needs_inputs(),
             #[cfg(feature = "extra")]
             Self::WindowAverage(avgcfg) => avgcfg.needs_inputs(),
+
+            //sims
+            #[cfg(feature = "sims")]
+            Self::DampedOscillator(simcfg) => simcfg.needs_inputs(),
         }
     }
 }

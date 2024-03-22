@@ -78,6 +78,8 @@ fn start_mjpeg_stream(/*kill_switch: impl Future<Output = ()> + Send + 'static*/
         "5",
         "--tuning-file",
         "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
+        "--mode", //mode makes sure to use the whole sensor, not cropping middle
+        "3280:2464:10:U",
         "-q",
         "50",
         "-t",

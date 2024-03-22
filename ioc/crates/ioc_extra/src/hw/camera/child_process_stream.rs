@@ -4,13 +4,13 @@ use tracing::{error, info};
 
 #[derive(Debug)]
 pub struct ChildProcessError {
-    message: String,
+    _message: String,
 }
 
 impl ChildProcessError {
     pub fn new(message: &str) -> Self {
         Self {
-            message: message.to_string(),
+            _message: message.to_string(),
         }
     }
 }
@@ -18,7 +18,7 @@ impl ChildProcessError {
 impl From<std::io::Error> for ChildProcessError {
     fn from(value: std::io::Error) -> Self {
         Self {
-            message: format!("{:?}", value),
+            _message: format!("{:?}", value),
         }
     }
 }

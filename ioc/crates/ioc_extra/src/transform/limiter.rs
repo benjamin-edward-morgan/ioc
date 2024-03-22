@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
 use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
-use tracing::{debug,info};
+use tracing::debug;
 use std::time::{Instant,Duration};
 use crate::input::SimpleInput;
 
