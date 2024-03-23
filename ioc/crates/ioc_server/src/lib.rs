@@ -10,6 +10,7 @@ use ioc_core::OutputKind;
 use ioc_core::Value;
 use tokio::join;
 use tokio::task::JoinHandle;
+use tracing::debug;
 use tracing::info;
 
 use std::net::SocketAddr;
@@ -19,7 +20,7 @@ use tower_http::trace::TraceLayer;
 use serde::Deserialize;
 
 use crate::server::{
-    endpoint::Endpoint, io::input::ServerInput, io::output::ServerOutput, io::ServerIoBuilder,
+    endpoint::Endpoint, io::ServerIoBuilder,
     state::ServerState,
 };
 
@@ -36,7 +37,16 @@ pub enum ServerInputConfig {
     },
     String {
         start: String,
-        max_length: u32,
+        max_length: usize,
+    },
+    Binary {
+        start: Vec<u8>,
+    },
+    Array {
+        start: Vec<Value>,
+    },
+    Object {
+        start: HashMap<String, Value>,
     },
 }
 
@@ -47,6 +57,7 @@ pub enum ServerOutputConfig {
     String,
     Binary,
     Array,
+    Object
 }
 
 #[derive(Deserialize, Debug)]
@@ -74,56 +85,20 @@ pub struct ServerConfig {
     pub io_channel_size: Option<usize>,
 }
 
-#[derive(Debug)]
-pub enum TypedInput {
-    Float(ServerInput<f64>),
-    Bool(ServerInput<bool>),
-    String(ServerInput<String>),
-}
 
-#[derive(Debug)]
-pub enum TypedOutput {
-    Float(ServerOutput<f64>),
-    Bool(ServerOutput<bool>),
-    String(ServerOutput<String>),
-    Binary(ServerOutput<Vec<u8>>),
-    Array(ServerOutput<Vec<Value>>),
-}
 
 pub struct Server {
     pub handle: JoinHandle<()>,
-    pub inputs: HashMap<String, TypedInput>,
-    pub outputs: HashMap<String, TypedOutput>,
+    pub inputs: HashMap<String, InputKind>,
+    pub outputs: HashMap<String, OutputKind>,
 }
 
 impl From<Server> for ModuleIO {
     fn from(server: Server) -> Self {
-        let mut inputs = HashMap::with_capacity(server.inputs.len());
-        for (k, input) in server.inputs {
-            let ik = match input {
-                TypedInput::String(str) => InputKind::String(Box::new(str)),
-                TypedInput::Float(float) => InputKind::Float(Box::new(float)),
-                TypedInput::Bool(bool) => InputKind::Bool(Box::new(bool)),
-            };
-            inputs.insert(k, ik);
-        }
-
-        let mut outputs = HashMap::with_capacity(server.outputs.len());
-        for (k, output) in server.outputs {
-            let ok = match output {
-                TypedOutput::String(str) => OutputKind::String(Box::new(str)),
-                TypedOutput::Float(float) => OutputKind::Float(Box::new(float)),
-                TypedOutput::Bool(bool) => OutputKind::Bool(Box::new(bool)),
-                TypedOutput::Binary(binary) => OutputKind::Binary(Box::new(binary)),
-                TypedOutput::Array(arr) => OutputKind::Array(Box::new(arr)),
-            };
-            outputs.insert(k, ok);
-        }
-
         ModuleIO {
             join_handle: server.handle,
-            inputs,
-            outputs,
+            inputs: server.inputs,
+            outputs: server.outputs,
         }
     }
 }
@@ -132,7 +107,7 @@ impl Module for Server {
     type Config = ServerConfig;
 
     async fn try_build(cfg: &ServerConfig) -> Result<Self, IocBuildError> {
-        info!("building server state ...");
+        debug!("building server state ...");
 
         //global state
         let state = ServerState::try_build(
@@ -142,7 +117,7 @@ impl Module for Server {
         )?;
         let cmd_tx = state.cmd_tx;
 
-        info!("building server inputs, outputs ...");
+        debug!("building server inputs, outputs ...");
         //create the inputs and outputs
         let mut inputs = HashMap::with_capacity(cfg.inputs.len());
         let mut outputs = HashMap::with_capacity(cfg.outputs.len());
@@ -150,24 +125,23 @@ impl Module for Server {
 
         let io_builder = ServerIoBuilder {
             cmd_tx: cmd_tx.clone(),
-            channel_size: cfg.io_channel_size.unwrap_or(16),
         };
-        info!("building server inputs ...");
+        debug!("building server inputs ...");
         for (key, input_config) in cfg.inputs.iter() {
             let srv_input = io_builder.try_build_input(key, input_config).await?;
             inputs.insert(key.to_string(), srv_input);
         }
-        info!("building server outputs ...");
+        debug!("building server outputs ...");
         for (key, output_config) in cfg.outputs.iter() {
             let srv_output = io_builder.try_build_output(key, output_config).await?;
             outputs.insert(key.to_string(), srv_output);
         }
 
         //build router service from endpoint configs
-        info!("building routers ...");
+        debug!("building routers ...");
         let mut router_service = axum::routing::Router::new();
         for (key, ep_config) in cfg.endpoints.iter() {
-            info!("building router {} ...", key);
+            debug!("building router {} ...", key);
             let endpoint: Endpoint = Endpoint::try_build(&cmd_tx, ep_config);
             router_service = endpoint.apply(key, router_service);
         }

@@ -1,7 +1,7 @@
 //!This is the core library for the IOC project. All other IOC libraries depend on this one. This includes all fundamental data types required for a running IOC instance.
 
 use error::IocBuildError;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::HashMap, fmt, future::Future};
 use tokio::{
     sync::{mpsc, watch},
@@ -42,7 +42,7 @@ impl<T> Output<T> {
 }
 
 ///Enum to hold fundamental data type values.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     String(String),
     Binary(Vec<u8>),
@@ -55,8 +55,20 @@ pub enum Value {
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(_deserializer: D) -> Result<Value, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
+        //we want these to deserialize without their enum wrapper
+        todo!()
+    }
+
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        //we want these to serialize without their enum wrapper
         todo!()
     }
 
