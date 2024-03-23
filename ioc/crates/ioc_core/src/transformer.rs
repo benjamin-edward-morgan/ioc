@@ -78,7 +78,7 @@ fn spawn_sum_task(inputs: &[Input<f64>]) -> (Input<f64>, JoinHandle<()>) {
     for (idx, mut source) in sources.into_iter().enumerate() {
         let update_tx = update_tx.clone();
         let handle = tokio::spawn(async move {
-            while let Ok(_) = source.changed().await {
+            while source.changed().await.is_ok() {
                 let new_value: f64 = *source.borrow_and_update();
                 let update = IndexedUpdate{ idx, new_value };
                 if let Err(err) = update_tx.send(update).await {

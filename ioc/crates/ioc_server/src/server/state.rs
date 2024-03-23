@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 #[derive(Debug, Clone)]
 pub(crate) enum ServerInputState {
@@ -20,13 +20,16 @@ pub(crate) enum ServerInputState {
     },
     String {
         value: String,
-        max_length: u32,
+        max_length: usize,
     },
     Binary {
         value: Vec<u8>,
     },
     Array {
-        value: Vec<f64>,
+        value: Vec<Value>,
+    },
+    Object {
+        value: HashMap<String, Value>,
     },
 }
 
@@ -37,6 +40,7 @@ pub(crate) enum ServerOutputState {
     String { value: Option<String> },
     Binary { value: Option<Vec<u8>> },
     Array { value: Option<Vec<Value>> },
+    Object { value: Option<HashMap<String, Value>> },
 }
 
 #[derive(Debug, Clone)]
@@ -64,22 +68,26 @@ pub(crate) enum StateCmd {
 impl From<&ServerInputConfig> for ServerInputState {
     fn from(config: &ServerInputConfig) -> Self {
         match config {
-            ServerInputConfig::Float {
-                start,
-                min,
-                max,
-                step,
-            } => ServerInputState::Float {
-                value: *start,
-                min: *min,
-                max: *max,
-                step: *step,
-            },
-            ServerInputConfig::Bool { start } => ServerInputState::Bool { value: *start },
-            ServerInputConfig::String { start, max_length } => ServerInputState::String {
-                value: start.to_string(),
-                max_length: *max_length,
-            },
+            ServerInputConfig::Float { start, min, max, step, } => 
+                ServerInputState::Float {
+                    value: *start,
+                    min: *min,
+                    max: *max,
+                    step: *step,
+                },
+            ServerInputConfig::Bool { start } => 
+                ServerInputState::Bool { value: *start },
+            ServerInputConfig::String { start, max_length } => 
+                ServerInputState::String {
+                    value: start.to_string(),
+                    max_length: *max_length,
+                },
+            ServerInputConfig::Array { start } => 
+                ServerInputState::Array { value: start.clone() },
+            ServerInputConfig::Binary { start } => 
+                ServerInputState::Binary { value: start.clone() },
+            ServerInputConfig::Object { start } =>
+                ServerInputState::Object { value: start.clone() },
         }
     }
 }
@@ -92,6 +100,7 @@ impl From<&ServerOutputConfig> for ServerOutputState {
             ServerOutputConfig::String => ServerOutputState::String { value: None },
             ServerOutputConfig::Binary => ServerOutputState::Binary { value: None },
             ServerOutputConfig::Array => ServerOutputState::Array { value: None },
+            ServerOutputConfig::Object => ServerOutputState::Object { value: None },
         }
     }
 }
@@ -279,7 +288,25 @@ impl ServerState {
                                             );
                                         }
                                     }
-                                    (_, _) => panic!("nope!"),
+                                    (
+                                        ServerInputState::Object {
+                                            value: updated_object_value,
+                                        },
+                                        ServerInputState::Object {
+                                            value: current_object_value,
+                                        },
+                                    ) => {
+                                        if *current_object_value != updated_object_value {
+                                            *current_object_value = updated_object_value.clone();
+                                            inputs.insert(
+                                                k,
+                                                ServerInputState::Object {
+                                                    value: updated_object_value,
+                                                },
+                                            );
+                                        }
+                                    }
+                                    (_ , _) => panic!("got either mismatched Input types, which shouldn't happen, or someone added a new type but forgot to add a match case in server state.")
                                 }
                             }
                         }
@@ -367,7 +394,23 @@ impl ServerState {
                                             },
                                         );
                                     }
-                                    (_, _) => panic!("nope!"),
+                                    (
+                                        ServerOutputState::Object {
+                                            value: updated_object_value,
+                                        },
+                                        ServerOutputState::Object {
+                                            value: current_object_value,
+                                        },
+                                    ) => {
+                                        *current_object_value = updated_object_value.clone();
+                                        outputs.insert(
+                                            k,
+                                            ServerOutputState::Object {
+                                                value: updated_object_value,
+                                            },
+                                        );
+                                    },
+                                    (_, _) => panic!("got either mismatched Output types, which shouldn't happen, or someone added a new type but forgot to add a match case in server state."),
                                 }
                             }
                         }
@@ -376,7 +419,7 @@ impl ServerState {
                     }
                 }
             }
-            info!("ServerState is done!");
+            debug!("ServerState is done!");
         });
 
         Ok(ServerState { handle, cmd_tx })

@@ -35,13 +35,16 @@ pub enum WsInputStateInitial {
     },
     String {
         value: String,
-        max_length: u32,
+        max_length: usize,
     },
     Binary {
         value: Vec<u8>,
     },
     Array {
-        value: Vec<f64>,
+        value: Vec<Value>,
+    },
+    Object {
+        value: HashMap<String, Value>,
     },
 }
 
@@ -59,12 +62,17 @@ impl From<ServerInputState> for WsInputStateInitial {
                 max,
                 step,
             },
-            ServerInputState::Bool { value } => WsInputStateInitial::Bool { value },
+            ServerInputState::Bool { value } => 
+                WsInputStateInitial::Bool { value },
             ServerInputState::String { value, max_length } => {
                 WsInputStateInitial::String { value, max_length }
             }
-            ServerInputState::Binary { value } => WsInputStateInitial::Binary { value },
-            ServerInputState::Array { value } => WsInputStateInitial::Array { value },
+            ServerInputState::Binary { value } => 
+                WsInputStateInitial::Binary { value },
+            ServerInputState::Array { value } => 
+                WsInputStateInitial::Array { value },
+            ServerInputState::Object { value } => 
+                WsInputStateInitial::Object { value },
         }
     }
 }
@@ -75,7 +83,8 @@ pub enum WsOutputStateInitial {
     Bool { value: Option<bool> },
     String { value: Option<String> },
     Binary { value: Option<Vec<u8>> },
-    Array { value: Option<Vec<f64>> },
+    Array { value: Option<Vec<Value>> },
+    Object { value: Option<HashMap<String, Value>> },
 }
 
 impl From<ServerOutputState> for WsOutputStateInitial {
@@ -85,21 +94,8 @@ impl From<ServerOutputState> for WsOutputStateInitial {
             ServerOutputState::Bool { value } => WsOutputStateInitial::Bool { value },
             ServerOutputState::String { value } => WsOutputStateInitial::String { value },
             ServerOutputState::Binary { value } => WsOutputStateInitial::Binary { value },
-            ServerOutputState::Array { value } => {
-                let value = match value {
-                    Some(value_vec) => {
-                        let vect = value_vec
-                            .iter()
-                            .map(|val| match val {
-                                Value::Float(f) => *f,
-                            })
-                            .collect();
-                        Some(vect)
-                    }
-                    None => None,
-                };
-                WsOutputStateInitial::Array { value }
-            }
+            ServerOutputState::Array { value } => WsOutputStateInitial::Array { value },
+            ServerOutputState::Object { value } => WsOutputStateInitial::Object { value },
         }
     }
 }
@@ -139,7 +135,8 @@ pub enum WsStateUpdate {
     Float { value: f64 },
     String { value: String },
     Binary { value: Vec<u8> },
-    Array { value: Vec<f64> },
+    Array { value: Vec<Value> },
+    Object { value: HashMap<String, Value> },
 }
 
 impl From<WsStateUpdate> for ServerInputState {
@@ -158,6 +155,7 @@ impl From<WsStateUpdate> for ServerInputState {
             },
             WsStateUpdate::Binary { value } => ServerInputState::Binary { value },
             WsStateUpdate::Array { value } => ServerInputState::Array { value },
+            WsStateUpdate::Object { value } => ServerInputState::Object { value },
         }
     }
 }
@@ -170,6 +168,7 @@ impl From<ServerInputState> for WsStateUpdate {
             ServerInputState::String { value, .. } => WsStateUpdate::String { value },
             ServerInputState::Binary { value } => WsStateUpdate::Binary { value },
             ServerInputState::Array { value } => WsStateUpdate::Array { value },
+            ServerInputState::Object { value } => WsStateUpdate::Object { value },
         }
     }
 }
@@ -180,22 +179,22 @@ impl From<ServerOutputState> for Option<WsStateUpdate> {
             ServerOutputState::Float { value, .. } => {
                 value.map(|value| WsStateUpdate::Float { value })
             }
-            ServerOutputState::Bool { value } => value.map(|value| WsStateUpdate::Bool { value }),
-            ServerOutputState::String { value, .. } => value.map(|value| WsStateUpdate::String {
-                value: value.to_string(),
-            }),
+            ServerOutputState::Bool { value } => value.map(|value| 
+                WsStateUpdate::Bool { value }
+            ),
+            ServerOutputState::String { value, .. } => value.map(|value| 
+                WsStateUpdate::String { value: value.to_string() }
+            ),
             ServerOutputState::Binary { value } => {
                 value.map(|value| WsStateUpdate::Binary { value })
-            }
-            ServerOutputState::Array { value } => value.map(|value| {
-                let value = value
-                    .iter()
-                    .map(|v| match v {
-                        Value::Float(f) => *f,
-                    })
-                    .collect();
+            },
+            ServerOutputState::Array { value } => value.map(|value|
                 WsStateUpdate::Array { value }
-            }),
+            ),
+            ServerOutputState::Object { value } => value.map(|value|
+                WsStateUpdate::Object { value }
+            ),
+
         }
     }
 }
