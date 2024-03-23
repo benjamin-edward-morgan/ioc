@@ -25,7 +25,7 @@ impl TransformerConfig for DampedOscillatorSimConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         let m = match upstream_inputs.get(&self.m) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(other) => {
                 return Err(IocBuildError::from_string(format!("expected {} to be a Float but got {:?}", self.m, other)))
             },
@@ -33,7 +33,7 @@ impl TransformerConfig for DampedOscillatorSimConfig {
         };
 
         let k = match upstream_inputs.get(&self.k) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(other) => {
                 return Err(IocBuildError::from_string(format!("expected {} to be a Float but got {:?}", self.k, other)))
             },
@@ -41,7 +41,7 @@ impl TransformerConfig for DampedOscillatorSimConfig {
         };
 
         let c = match upstream_inputs.get(&self.c) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(other) => {
                 return Err(IocBuildError::from_string(format!("expected {} to be a Float but got {:?}", self.c, other)))
             },
@@ -49,7 +49,7 @@ impl TransformerConfig for DampedOscillatorSimConfig {
         };
 
         let f = match upstream_inputs.get(&self.f) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(other) => {
                 return Err(IocBuildError::from_string(format!("expected {} to be a Float but got {:?}", self.f, other)))
             },
@@ -65,8 +65,8 @@ impl TransformerConfig for DampedOscillatorSimConfig {
         Ok(TransformerI{
             join_handle: oscillator.join_handle,
             inputs: HashMap::from([
-                ("x".to_string(), InputKind::float(oscillator.x)),
-                ("v".to_string(), InputKind::float(oscillator.v)),
+                ("x".to_string(), InputKind::Float(oscillator.x)),
+                ("v".to_string(), InputKind::Float(oscillator.v)),
             ]),
         })
     }

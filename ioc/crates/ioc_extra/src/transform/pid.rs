@@ -1,22 +1,21 @@
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, time::sleep, task::JoinHandle};
+use tokio::{time::sleep, task::JoinHandle};
 use std::collections::HashMap;
 use std::time::{Instant,Duration};
 use tracing::debug;
-use crate::input::SimpleInput;
 
 pub struct PidConfig<'a> {
-    pub set_point: &'a dyn Input<f64>,
-    pub process_var: &'a dyn Input<f64>,
-    pub p: &'a dyn Input<f64>,
-    pub i: &'a dyn Input<f64>,
-    pub d: &'a dyn Input<f64>,
-    pub period_ms: u16,
+    pub set_point: &'a Input<f64>,
+    pub process_var: &'a Input<f64>,
+    pub p: &'a Input<f64>,
+    pub i: &'a Input<f64>,
+    pub d: &'a Input<f64>,
+    pub period_ms: u64,
 }
 
 pub struct Pid {
     pub join_handle: JoinHandle<()>,
-    pub value: SimpleInput<f64>,
+    pub value: Input<f64>,
 }
 
 impl From<Pid> for TransformerI {
@@ -24,7 +23,7 @@ impl From<Pid> for TransformerI {
         TransformerI{
             join_handle: pid.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(pid.value)),
+                ("value".to_string(), InputKind::Float(pid.value)),
             ]),
         }
     }
@@ -34,65 +33,58 @@ impl<'a> Transformer<'a> for Pid {
     type Config = PidConfig<'a>;
 
     async fn try_build(cfg: &PidConfig<'a>) -> Result<Pid, IocBuildError> {
-
-        let (value_tx, value_rx) = broadcast::channel(10);
-        let set_point = cfg.set_point.source();
-        let process_var = cfg.process_var.source();
-        let p = cfg.p.source();
-        let i = cfg.i.source();
-        let d = cfg.d.source();
+        let mut set_point = cfg.set_point.source();
+        let mut process_var = cfg.process_var.source();
+        let mut p = cfg.p.source();
+        let mut i = cfg.i.source();
+        let mut d = cfg.d.source();
 
         let mut state = PidState::new(
-            p.start,
-            i.start,
-            d.start,
-            set_point.start,
-            process_var.start,
+            *p.borrow_and_update(),
+            *i.borrow_and_update(),
+            *d.borrow_and_update(),
+            *set_point.borrow_and_update(),
+            *process_var.borrow_and_update(),
         );
         //start with just a p component for the output
-        let start_value = state.last_err * p.start;
-        let value = SimpleInput::new(start_value, value_rx);
-
-        let mut p_rx = p.rx;
-        let mut i_rx = i.rx;
-        let mut d_rx = d.rx;
-        let mut sp_rx = set_point.rx;
-        let mut pv_rx = process_var.rx;
+        let start_value = state.last_err * *p.borrow_and_update();
+        let (value, value_tx) = Input::new(start_value);
+        let period_ms = cfg.period_ms;
         let join_handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = sleep(Duration::from_millis(10)) => {},
-                    p_res = p_rx.recv() => {
-                        if let Ok(p) = p_res {
-                            state.p=p;
+                    _ = sleep(Duration::from_millis(period_ms)) => {},
+                    p_res = p.changed() => {
+                        if p_res.is_ok() {
+                            state.p= *p.borrow_and_update();
                         } else {
                             break;
                         }
                     },
-                    i_res = i_rx.recv() => {
-                        if let Ok(i) = i_res {
-                            state.i=i;
+                    i_res = i.changed() => {
+                        if i_res.is_ok() {
+                            state.i= *i.borrow_and_update();
                         } else {
                             break;
                         }
                     },
-                    d_res = d_rx.recv() => {
-                        if let Ok(d) = d_res {
-                            state.d=d;
+                    d_res = d.changed() => {
+                        if d_res.is_ok() {
+                            state.d= *d.borrow_and_update();
                         } else {
                             break;
                         }
                     },
-                    sp_res = sp_rx.recv() => {
-                        if let Ok(sp) = sp_res {
-                            state.set_point=sp;
+                    set_point_res = set_point.changed() => {
+                        if set_point_res.is_ok() {
+                            state.set_point= *set_point.borrow_and_update();
                         } else {
                             break;
                         }
                     },
-                    pv_res = pv_rx.recv() => {
-                        if let Ok(pv) = pv_res {
-                            state.process_var=pv;
+                    process_var_res = process_var.changed() => {
+                        if process_var_res.is_ok() {
+                            state.process_var= *process_var.borrow_and_update();
                         } else {
                             break;
                         }
@@ -101,7 +93,7 @@ impl<'a> Transformer<'a> for Pid {
 
                 let value = state.step();
 
-                if let Err(_) = value_tx.send(value) {
+                if value_tx.send(value).is_err() {
                     break;
                 }
             }

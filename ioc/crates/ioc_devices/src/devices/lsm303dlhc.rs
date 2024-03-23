@@ -1,12 +1,11 @@
 use std::{collections::HashMap, time::Duration};
 
 use embedded_hal_0::blocking::i2c;
-use ioc_core::{error::IocBuildError, InputKind, ModuleBuilder, ModuleIO, Value};
+use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO, Value};
 
-use super::VectorInput;
 use lsm303dlhc::Lsm303dlhc;
 use serde::Deserialize;
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::{task::JoinHandle, time::sleep};
 use tracing::warn;
 
 #[derive(Deserialize, Debug)]
@@ -14,8 +13,8 @@ pub struct Lsm303dlhcDeviceConfig {}
 
 pub struct Lsm303dlhcDevice {
     pub join_handle: JoinHandle<()>,
-    pub accelerometer: VectorInput,
-    pub magnetometer: VectorInput,
+    pub accelerometer: Input<Vec<Value>>,
+    pub magnetometer: Input<Vec<Value>>,
 }
 
 impl Lsm303dlhcDevice {
@@ -29,10 +28,12 @@ impl Lsm303dlhcDevice {
         device.mag_odr(lsm303dlhc::MagOdr::Hz30)?;
         device.accel_odr(lsm303dlhc::AccelOdr::Hz25)?;
 
-        let (accel_tx, accel_rx) = broadcast::channel(10);
-        let (mag_tx, mag_rx) = broadcast::channel(10);
         let accel_scale = 2.0 / (1 << 15) as f64; //to scale outputs to gs
         let mag_scale = 1.3 / (1 << 15) as f64; //to scale to milligaus
+
+        let (accelerometer, accel_tx) = Input::new(Vec::new());
+        let (magnetometer, mag_tx) = Input::new(Vec::new());
+
         let join_handle = tokio::spawn(async move {
             loop {
                 match device.accel() {
@@ -74,8 +75,6 @@ impl Lsm303dlhcDevice {
                 sleep(Duration::from_millis(100)).await;
             }
         });
-        let accelerometer = VectorInput::new(accel_rx);
-        let magnetometer = VectorInput::new(mag_rx);
 
         Ok(Self {
             join_handle,
@@ -92,11 +91,11 @@ impl From<Lsm303dlhcDevice> for ModuleIO {
             inputs: HashMap::from([
                 (
                     "accelerometer".to_string(),
-                    InputKind::array(dev.accelerometer),
+                    InputKind::Array(dev.accelerometer),
                 ),
                 (
                     "magnetometer".to_string(),
-                    InputKind::array(dev.magnetometer),
+                    InputKind::Array(dev.magnetometer),
                 ),
             ]),
             outputs: HashMap::new(),

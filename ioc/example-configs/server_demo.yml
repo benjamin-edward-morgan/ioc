@@ -1,0 +1,39 @@
+metadata:
+  name: server test
+  description: just to test server imput/output types
+
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs:
+        float_in:
+          Float: { start: 1.0, min: 0.01, max: 10.0, step: 0.01 }
+        bool_in:
+          Bool: { start: true }
+        string_in:
+          String: { start: "hello", max_length: 100 }
+        # binary_in: 
+        #   Binary: { start: [0xDE, 0xAD, 0xBE, 0xEF], max_length: 100 }
+        # array_in:
+        #   Array: { start: [1, 2, 3, 4, 5], max_length: 100 }
+      outputs:
+        float_out: Float
+        bool_out: Bool
+        string_out: String
+      endpoints: 
+        "/ws":
+          WebSocket: 
+            inputs: [float_in, bool_in, string_in]
+            outputs: [ float_out, bool_out, string_out]
+
+
+transformers:
+
+
+
+pipes:
+  - { from: local_server.float_in, to: local_server.float_out }
+  - { from: local_server.bool_in, to: local_server.bool_out }
+  - { from: local_server.string_in, to: local_server.string_out }

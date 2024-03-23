@@ -1,20 +1,20 @@
 use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::sync::watch;
+use tokio::{task::JoinHandle, time::sleep};
 use tracing::{info, warn};
 use std::time::{Instant,Duration};
 use std::sync::{Arc, Mutex};
-use crate::input::SimpleInput;
 
 pub struct WindowAverageFilterConfig<'a> {
-    pub input: &'a dyn Input<f64>,
+    pub input: &'a Input<f64>,
     pub period_ms: u64,
 }
 
 pub struct WindowAverage {
     pub join_handle: JoinHandle<()>,
-    pub value: SimpleInput<f64>,
+    pub value: Input<f64>,
 }
 
 impl From<WindowAverage> for TransformerI {
@@ -22,7 +22,7 @@ impl From<WindowAverage> for TransformerI {
         TransformerI{
             join_handle: avg.join_handle,
             inputs: HashMap::from([
-                ("value".to_owned(), InputKind::float(avg.value))
+                ("value".to_owned(), InputKind::Float(avg.value))
             ])
         }
     }
@@ -76,8 +76,8 @@ impl WindowAverageState {
 
 fn spawn_window_avg_task(
     start: f64,
-    mut in_rx: broadcast::Receiver<f64>,
-    out_tx: broadcast::Sender<f64>,
+    mut in_rx: watch::Receiver<f64>,
+    out_tx: watch::Sender<f64>,
     period_ms: u64,
 ) -> JoinHandle<()> {
 
@@ -102,7 +102,8 @@ fn spawn_window_avg_task(
 
     //read task 
     tokio::spawn(async move {
-        while let Ok(new_in) = in_rx.recv().await {
+        while in_rx.changed().await.is_ok() {
+            let new_in = *in_rx.borrow_and_update();
             let mut state = match state.lock() {
                 Ok(state) => state,
                 Err(poisoned) => poisoned.into_inner(),
@@ -118,12 +119,10 @@ impl <'a> Transformer<'a> for WindowAverage {
     type Config = WindowAverageFilterConfig<'a>;
 
     async fn try_build(cfg: &WindowAverageFilterConfig<'a>) -> Result<WindowAverage, IocBuildError> {
-        let in_src = cfg.input.source();
-        let in_rx = in_src.rx;
-        let start = in_src.start;
+        let mut in_rx = cfg.input.source();
+        let start = *in_rx.borrow_and_update();
 
-        let (out_tx, out_rx) = broadcast::channel(10);
-        let value = SimpleInput::new(start, out_rx);
+        let (value, out_tx) = Input::new(start);
 
         let join_handle = spawn_window_avg_task(start, in_rx, out_tx, cfg.period_ms);
         Ok(WindowAverage{

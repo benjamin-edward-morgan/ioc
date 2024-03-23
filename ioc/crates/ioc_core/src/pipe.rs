@@ -11,13 +11,13 @@ pub struct Pipe {
 
 impl Pipe {
     ///Create a new `Pipe`. Spawns a task that reads from the input and writes to the output.
-    pub fn new<T: Send + Sync + Copy + 'static>(input: &Input<T>, output: &Output<T>) -> Pipe {
+    pub fn new<T: Send + Sync + Clone + 'static>(input: &Input<T>, output: &Output<T>) -> Pipe {
         let mut source = input.source();
         let sink = output.sink();
 
         let handle = tokio::spawn(async move {
             loop {
-                let value: T = *source.borrow_and_update();
+                let value: T = source.borrow_and_update().clone();
                 if let Err(err) = sink.send(value).await {
                     error!("Pipe error sending to sink: {}", err);
                     return;

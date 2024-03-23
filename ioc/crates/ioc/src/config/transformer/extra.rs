@@ -28,7 +28,7 @@ impl TransformerConfig for HBridgeTransformerConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build hbridge from non-float input of type {x:?}"
@@ -47,9 +47,9 @@ impl TransformerConfig for HBridgeTransformerConfig {
         Ok(TransformerI {
             join_handle: hbridge.join_handle,
             inputs: HashMap::from([
-                ("forward".to_owned(), InputKind::float(hbridge.forward)),
-                ("reverse".to_owned(), InputKind::float(hbridge.reverse)),
-                ("enable".to_owned(), InputKind::float(hbridge.enable)),
+                ("forward".to_owned(), InputKind::Float(hbridge.forward)),
+                ("reverse".to_owned(), InputKind::Float(hbridge.reverse)),
+                ("enable".to_owned(), InputKind::Float(hbridge.enable)),
             ]),
         })
     }
@@ -81,7 +81,7 @@ impl TransformerConfig for LinearTransformerConfig {
             ));
         }
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build linear transformer from non-float input of type {x:?}"
@@ -102,7 +102,7 @@ impl TransformerConfig for LinearTransformerConfig {
         let xform = LinearTransform::try_build(&lcfg).await?;
         Ok(TransformerI {
             join_handle: xform.join_handle,
-            inputs: HashMap::from([("value".to_string(), InputKind::float(xform.value))]),
+            inputs: HashMap::from([("value".to_string(), InputKind::Float(xform.value))]),
         })
     }
 
@@ -126,12 +126,12 @@ impl TransformerConfig for ClampConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         if self.min > self.max {
-            return Err(IocBuildError::from_string(format!(
+            return Err(IocBuildError::message(
                 "unable to build clamp transformer. must have min <= max"
-            )));
+            ));
         }
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build clamp transformer from non-float input of type {:?}",
@@ -153,7 +153,7 @@ impl TransformerConfig for ClampConfig {
         Ok(TransformerI{
             join_handle: output.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(output.value)),
+                ("value".to_string(), InputKind::Float(output.value)),
             ])
         })
     }
@@ -176,7 +176,7 @@ impl TransformerConfig for HeadingConfig {
     ) -> Result<TransformerI, IocBuildError> {
 
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Array(arr)) => arr.as_ref(),
+            Some(InputKind::Array(arr)) => arr,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build clamp transformer from non-array input of type {:?}",
@@ -193,9 +193,12 @@ impl TransformerConfig for HeadingConfig {
 
         let output = FunctionTransformer::new(input, move |vec: Vec<Value>| {
             if vec.len() > 2 {
-                let Value::Float(x) = vec.get(0).unwrap();
-                let Value::Float(y) = vec.get(1).unwrap();
-                y.atan2(*x)
+                match (&vec[0], &vec[1]) {
+                    (Value::Float(x), Value::Float(y)) => {
+                        y.atan2(*x)
+                    },
+                    _ => f64::NAN
+                }
             } else {
                 f64::NAN
             }
@@ -203,7 +206,7 @@ impl TransformerConfig for HeadingConfig {
         Ok(TransformerI{
             join_handle: output.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(output.value)),
+                ("value".to_string(), InputKind::Float(output.value)),
             ])
         })
     }
@@ -226,7 +229,7 @@ pub struct PidCtrlConfig {
     d: String,
     set_point: String,
     process_var: String,
-    period_ms: u16,
+    period_ms: u64,
 }
 
 impl TransformerConfig for PidCtrlConfig {
@@ -235,7 +238,7 @@ impl TransformerConfig for PidCtrlConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         let p = match upstream_inputs.get(&self.p) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build pid controller from non-float input of type {:?}",
@@ -250,7 +253,7 @@ impl TransformerConfig for PidCtrlConfig {
             }
         };
         let i = match upstream_inputs.get(&self.i) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build pid controller from non-float input of type {:?}",
@@ -265,7 +268,7 @@ impl TransformerConfig for PidCtrlConfig {
             }
         };
         let d = match upstream_inputs.get(&self.d) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build pid controller from non-float input of type {:?}",
@@ -280,7 +283,7 @@ impl TransformerConfig for PidCtrlConfig {
             }
         };
         let sp = match upstream_inputs.get(&self.set_point) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build pid controller from non-float input of type {:?}",
@@ -295,7 +298,7 @@ impl TransformerConfig for PidCtrlConfig {
             }
         };
         let pv = match upstream_inputs.get(&self.process_var) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build pid controller from non-float input of type {:?}",
@@ -314,9 +317,9 @@ impl TransformerConfig for PidCtrlConfig {
             &PidConfig{
                 set_point: sp,
                 process_var: pv,
-                p: p,
-                i: i,
-                d: d,
+                p,
+                i,
+                d,
                 period_ms: self.period_ms,
             }
         ).await?;
@@ -324,7 +327,7 @@ impl TransformerConfig for PidCtrlConfig {
         Ok(TransformerI{
             join_handle: pid.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(pid.value)),
+                ("value".to_string(), InputKind::Float(pid.value)),
             ])
         })
     }
@@ -363,7 +366,7 @@ impl TransformerConfig for LimiterConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build limiter from non-float input of type {:?}",
@@ -391,7 +394,7 @@ impl TransformerConfig for LimiterConfig {
         Ok(TransformerI{
             join_handle: limiter.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(limiter.value)),
+                ("value".to_string(), InputKind::Float(limiter.value)),
             ])
         })
     }
@@ -416,7 +419,7 @@ impl TransformerConfig for WindowAverageConfig {
         upstream_inputs: &HashMap<String, InputKind>,
     ) -> Result<TransformerI, IocBuildError> {
         let input = match upstream_inputs.get(&self.input) {
-            Some(InputKind::Float(float)) => float.as_ref(),
+            Some(InputKind::Float(float)) => float,
             Some(x) => {
                 return Err(IocBuildError::from_string(format!(
                     "unable to build windowed average filter from non-float input of type {:?}",
@@ -439,7 +442,7 @@ impl TransformerConfig for WindowAverageConfig {
         Ok(TransformerI{
             join_handle: avg.join_handle,
             inputs: HashMap::from([
-                ("value".to_string(), InputKind::float(avg.value)),
+                ("value".to_string(), InputKind::Float(avg.value)),
             ])
         })
     }

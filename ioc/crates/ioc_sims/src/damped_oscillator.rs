@@ -1,18 +1,18 @@
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, task::JoinHandle};
+use tokio::{sync:: watch, task::JoinHandle};
 use tracing::warn;
 use std::{collections::HashMap, time::{Duration, Instant}};
 
 use peroxide::{fuga::{ExMethod, NoEnv, ODE}, numerical::ode::{ExplicitODE, State}};
 
-use crate::{InputAverager, SimIn};
+use crate::InputAverager;
 
 ///A running simulation of a damped oscillator. x gives the position, v gives the velocity
 pub struct DampedOscillator {
     pub join_handle: JoinHandle<()>,
-    pub x: SimIn<f64>, //position
-    pub v: SimIn<f64>, //velocity
+    pub x: Input<f64>, //position
+    pub v: Input<f64>, //velocity
 }
 
 impl From<DampedOscillator> for TransformerI {
@@ -20,14 +20,14 @@ impl From<DampedOscillator> for TransformerI {
         Self{
             join_handle: oscillator.join_handle,
             inputs: HashMap::from([
-                ("x".to_string(), InputKind::float(oscillator.x)),
-                ("v".to_string(), InputKind::float(oscillator.v)),
+                ("x".to_string(), InputKind::Float(oscillator.x)),
+                ("v".to_string(), InputKind::Float(oscillator.v)),
             ]),
         }
     }
 }
 
-fn spawn_sim_task(cfg: &DampedOscillatorConfig, x_tx: broadcast::Sender<f64>, v_tx: broadcast::Sender<f64>) -> JoinHandle<()> {
+fn spawn_sim_task(cfg: &DampedOscillatorConfig, x_tx: watch::Sender<f64>, v_tx: watch::Sender<f64>) -> JoinHandle<()> {
     let mut m = InputAverager::new(cfg.m);
     let mut c = InputAverager::new(cfg.c);
     let mut k = InputAverager::new(cfg.k);
@@ -129,10 +129,10 @@ fn oscillator_fn(state: &mut State<f64>, _: &NoEnv) {
 /// };
 /// ```
 pub struct DampedOscillatorConfig<'a> {
-    pub m: &'a dyn Input<f64>, //mass - must be greater than zero
-    pub c: &'a dyn Input<f64>, //damping coefficient - must be greater than or equal to zero
-    pub k: &'a dyn Input<f64>, //spring constant - must be greater than zero
-    pub f: &'a dyn Input<f64>, //external force
+    pub m: &'a Input<f64>, //mass - must be greater than zero
+    pub c: &'a Input<f64>, //damping coefficient - must be greater than or equal to zero
+    pub k: &'a Input<f64>, //spring constant - must be greater than zero
+    pub f: &'a Input<f64>, //external force
     pub period_ms: u64, //how frequently to emit a frame
     pub steps_per_frame: u64, //how many integration steps to take per frame
 }
@@ -142,17 +142,8 @@ impl<'a> Transformer<'a> for DampedOscillator {
 
     async fn try_build(cfg: &Self::Config) -> Result<Self, IocBuildError> {
         
-        let (x_tx, x_rx) = broadcast::channel(10);
-        let x = SimIn{
-            start: 0.0,
-            rx: x_rx,
-        };
-
-        let (v_tx, v_rx) = broadcast::channel(10);
-        let v = SimIn{
-            start: 0.0,
-            rx: v_rx,
-        };
+        let (x, x_tx) = Input::new(0.0);
+        let (v, v_tx) = Input::new(0.0);
 
         let join_handle = spawn_sim_task(cfg, x_tx, v_tx);
 

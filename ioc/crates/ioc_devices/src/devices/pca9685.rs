@@ -5,14 +5,14 @@ use std::{
 
 use embedded_hal_0::blocking::i2c;
 use futures::future::join_all;
-use ioc_core::{error::IocBuildError, ModuleBuilder, ModuleIO, Output, OutputKind, OutputSink};
+use ioc_core::{error::IocBuildError, ModuleBuilder, ModuleIO, Output, OutputKind};
 use pwm_pca9685::{Address, Channel, Pca9685};
 use serde::Deserialize;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::error::DeviceConfigError;
 
-use tracing::{error, info};
+use tracing::{debug, error};
 
 //system level config -- corresponds to 1 pwm chip instance
 #[derive(Debug, Deserialize)]
@@ -24,7 +24,7 @@ pub struct Pca9685DeviceConfig {
 //connected pwm chip instance
 pub struct Pca9685Device {
     pub join_handle: JoinHandle<()>,
-    pub channels: HashMap<String, Pca9685PwmOutput>,
+    pub channels: HashMap<String, Output<f64>>,
 }
 
 impl From<Pca9685Device> for ModuleIO {
@@ -35,7 +35,7 @@ impl From<Pca9685Device> for ModuleIO {
             outputs: dev
                 .channels
                 .into_iter()
-                .map(|(key, out)| (key, OutputKind::float(out)))
+                .map(|(key, out)| (key, OutputKind::Float(out)))
                 .collect(),
         }
     }
@@ -54,6 +54,31 @@ where
         };
         DeviceConfigError::new(message)
     }
+}
+
+fn spawn_pca_output_task<I2C, E>(
+    device: Arc<Mutex<Pca9685<I2C>>>,
+    channel: u8,
+    mut tx: mpsc::Receiver<f64>
+) -> JoinHandle<()> 
+where
+        E: std::fmt::Debug,
+        I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
+{
+    tokio::spawn(async move {
+        let chann = Channel::try_from(channel).unwrap();
+        while let Some(new_value) = tx.recv().await {
+            let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
+            let mut device = match device.lock() {
+                Ok(device) => device,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            if let Err(err) = device.set_channel_on_off(chann, 0, off_time) {
+                error!("error setting PCA9685 device output! {:?}", err);
+            }
+        }
+        debug!("Pca9685Device output task for channel {} shutting down.", channel)
+    })
 }
 
 impl Pca9685Device {
@@ -76,14 +101,15 @@ impl Pca9685Device {
         let mut channels = HashMap::with_capacity(config.channels.len());
         let mut join_handles: Vec<JoinHandle<()>> = Vec::with_capacity(config.channels.len());
         for (k, c) in &config.channels {
-            let (output, join_handle) = Pca9685PwmOutput::try_build(device.clone(), *c)?;
-            join_handles.push(join_handle);
+            let (output, out_rx) = Output::new();
+            let join_handle = spawn_pca_output_task(device.clone(), *c, out_rx);
             channels.insert(k.to_string(), output);
+            join_handles.push(join_handle);
         }
 
         let join_handle = tokio::spawn(async move {
             join_all(join_handles).await;
-            info!("pca 9685 is done!")
+            debug!("pca 9685 tasks all done!")
         });
 
         Ok(Pca9685Device {
@@ -126,53 +152,5 @@ where
         let i2c = (self.i2c_bus_provider)(1);
         let dev = Pca9685Device::build(cfg, i2c)?;
         Ok(dev)
-    }
-}
-
-//pwm float output associated with a channel (pin) on a Pca9685Device
-//clamped to [0.0, 1.0] which maps to a duty cycle from 0 to 100%
-pub struct Pca9685PwmOutput {
-    tx: mpsc::Sender<f64>,
-}
-
-impl Pca9685PwmOutput {
-    fn try_build<I2C, E>(
-        device: Arc<Mutex<Pca9685<I2C>>>,
-        channel: u8,
-    ) -> Result<(Self, JoinHandle<()>), DeviceConfigError>
-    where
-        E: std::fmt::Debug,
-        I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
-    {
-        let (tx, mut rx) = mpsc::channel::<f64>(100);
-        let chann = Channel::try_from(channel).map_err(|_| {
-            DeviceConfigError::new(format!("Invalid channel for PCA9685 {}", channel))
-        })?;
-
-        let device = device.clone();
-        let join_handle = tokio::spawn(async move {
-            while let Some(new_value) = rx.recv().await {
-                // info!("new val: {}", new_value);
-                let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
-                let mut device = match device.lock() {
-                    Ok(device) => device,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
-                if let Err(err) = device.set_channel_on_off(chann, 0, off_time) {
-                    error!("error setting PCA9685 device output! {:?}", err);
-                }
-            }
-            info!("Pca9685PwmOutput for channel {} shutting down.", channel);
-        });
-
-        Ok((Self { tx }, join_handle))
-    }
-}
-
-impl Output<f64> for Pca9685PwmOutput {
-    fn sink(&self) -> OutputSink<f64> {
-        OutputSink {
-            tx: self.tx.clone(),
-        }
     }
 }

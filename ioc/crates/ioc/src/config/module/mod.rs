@@ -7,10 +7,7 @@ use ioc_server::{Server, ServerConfig};
 
 //ioc_extra
 #[cfg(feature = "extra")]
-use ioc_extra::{
-    hw::camera::{Camera, CameraConfig},
-    input::noise::{NoiseInput, NoiseInputConfig},
-};
+use ioc_extra::hw::camera::{Camera, CameraConfig};
 
 //ioc_devices
 #[cfg(feature = "devices")]
@@ -42,8 +39,6 @@ pub enum IocModuleConfig {
 
     //ioc_extra
     #[cfg(feature = "extra")]
-    Noise(NoiseInputConfig),
-    #[cfg(feature = "extra")]
     RaspiCam(CameraConfig),
 
     //ioc_devices
@@ -67,15 +62,11 @@ impl IocModuleConfig {
 
             //server
             #[cfg(feature = "server")]
-            Self::Server(server_config) => Server::try_build(&server_config)
+            Self::Server(server_config) => Server::try_build(server_config)
                 .await
                 .map(|server| server.into()),
 
             //extra
-            #[cfg(feature = "extra")]
-            Self::Noise(noise_config) => NoiseInput::try_build(&noise_config)
-                .await
-                .map(|noise| noise.into()),
             #[cfg(feature = "extra")]
             Self::RaspiCam(cam_config) => Camera::try_build(cam_config).await.map(|cam| cam.into()),
 
