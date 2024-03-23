@@ -6,8 +6,8 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, warn};
 
 
-pub struct SumConfig {
-    pub inputs: Vec<Input<f64>>,
+pub struct SumConfig<'a> {
+    pub inputs: &'a [&'a Input<f64>],
 }
 
 ///Sum Transformer
@@ -27,11 +27,11 @@ impl From<Sum> for TransformerI {
     }
 }
 
-impl Transformer<'_> for Sum {
-    type Config = SumConfig;
+impl <'a> Transformer<'a> for Sum {
+    type Config = SumConfig<'a>;
 
-    async fn try_build(cfg: &SumConfig) -> Result<Sum, IocBuildError> {
-        let (value, join_handle) = spawn_sum_task(&cfg.inputs);
+    async fn try_build(cfg: &SumConfig<'a>) -> Result<Sum, IocBuildError> {
+        let (value, join_handle) = spawn_sum_task(cfg.inputs);
         Ok(Sum {value, join_handle})
     }
 }
@@ -41,7 +41,7 @@ struct IndexedUpdate{
     new_value: f64,
 }
 
-fn spawn_sum_task(inputs: &[Input<f64>]) -> (Input<f64>, JoinHandle<()>) {
+fn spawn_sum_task(inputs: &[&Input<f64>]) -> (Input<f64>, JoinHandle<()>) {
 
     //get sources and current values for each input
     let mut values = Vec::with_capacity(inputs.len());

@@ -1,10 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
-use super::ScalerInput;
 use embedded_hal::i2c;
-use ioc_core::{error::IocBuildError, InputKind, ModuleBuilder, ModuleIO};
+use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO};
 use serde::Deserialize;
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::{sync::watch, task::JoinHandle, time::sleep};
 use tracing::error;
 
 #[derive(Deserialize, Clone, Copy, Debug)]
@@ -32,8 +31,8 @@ impl Default for Bmp180DeviceConfig {
 
 pub struct Bmp180Device {
     pub join_handle: JoinHandle<()>,
-    pub temperature_c: ScalerInput,
-    pub pressure_h_pa: ScalerInput,
+    pub temperature_c: Input<f64>,
+    pub pressure_h_pa: Input<f64>,
 }
 
 impl From<Bmp180Device> for ModuleIO {
@@ -43,11 +42,11 @@ impl From<Bmp180Device> for ModuleIO {
             inputs: HashMap::from([
                 (
                     "temperature_c".to_owned(),
-                    InputKind::float(dev.temperature_c),
+                    InputKind::Float(dev.temperature_c),
                 ),
                 (
                     "pressure_h_pa".to_owned(),
-                    InputKind::float(dev.pressure_h_pa),
+                    InputKind::Float(dev.pressure_h_pa),
                 ),
             ]),
             outputs: HashMap::new(),
@@ -193,8 +192,8 @@ impl Bmp180CalibrationData {
 }
 
 fn spawn_sensor_read_task<I2C>(
-    temp_tx: broadcast::Sender<f64>,
-    press_tx: broadcast::Sender<f64>,
+    temp_tx: watch::Sender<f64>,
+    press_tx: watch::Sender<f64>,
     mut i2c: I2C,
     calib: Bmp180CalibrationData,
     pressure_precision: PressurePrecision,
@@ -283,8 +282,8 @@ impl Bmp180Device {
                 .unwrap();
             let calib = Bmp180CalibrationData::from_bytes(&buffer)?;
 
-            let (temp_tx, temp_rx) = broadcast::channel(10);
-            let (press_tx, press_rx) = broadcast::channel(10);
+            let (temp, temp_tx) = Input::new(f64::NAN);
+            let (press, press_tx) = Input::new(f64::NAN);
 
             let join_handle = spawn_sensor_read_task(
                 temp_tx,
@@ -297,8 +296,8 @@ impl Bmp180Device {
 
             Ok(Self {
                 join_handle,
-                temperature_c: ScalerInput::new(temp_rx),
-                pressure_h_pa: ScalerInput::new(press_rx),
+                temperature_c: temp,
+                pressure_h_pa: press,
             })
         }
     }

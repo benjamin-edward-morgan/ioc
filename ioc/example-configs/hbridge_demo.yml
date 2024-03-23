@@ -1,6 +1,6 @@
 metadata:
-  name: window average filter
-  description: demo of window average filter
+  name: hbridge demo
+  description: demo of the hbridge filter
 
 # modules expose inputs and outputs from various sources
 modules:
@@ -9,24 +9,28 @@ modules:
       port: 8080
       root_context: /
       inputs:
-        target: 
+        x: 
           Float: { start: 0.0, min: -10.0, max: 10.0, step: 0.01 }
       outputs:
-        x: Float
+        forward: Float
+        reverse: Float
+        enable: Float
       endpoints:
         "/ws":
           WebSocket: 
-            inputs: [ target ]
-            outputs: [ x ]
+            inputs: [ x ]
+            outputs: [ forward, reverse, enable ]
  
 # transformers read from one or more inputs and produce one or more new inputs
 transformers:
 
-  avg:
-    WindowAverage:
-      input: local_server.target
-      period_ms: 250
+  hbridge:
+    HBridge:
+      input: local_server.x
+ 
 
 # pipes read from inputs and write to outputs
 pipes:
-  - { from: avg.value, to: local_server.x}
+  - { from: hbridge.forward, to: local_server.forward }
+  - { from: hbridge.reverse, to: local_server.reverse }
+  - { from: hbridge.enable, to: local_server.enable } 

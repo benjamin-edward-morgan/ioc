@@ -25,7 +25,7 @@ pub struct IocMetadataConfig {
 pub struct IocConfig {
     pub metadata: IocMetadataConfig,
     pub modules: config_rs::Map<String, IocModuleConfig>,
-    pub transformers: config_rs::Map<String, IocTransformerConfig>,
+    pub transformers: Option<config_rs::Map<String, IocTransformerConfig>>,
     pub pipes: Vec<PipeConfig>,
 }
 
@@ -67,7 +67,7 @@ impl IocConfig {
         set of all inputs. We iterate along all remaining transformers until they are all built.
         */
         debug!("done bulding modules. building transformers ...");
-        let mut remaining_xformers = self.transformers;
+        let mut remaining_xformers = self.transformers.unwrap_or_default();
         while !remaining_xformers.is_empty() {
             let mut processed_xformers = HashSet::new();
 
@@ -117,7 +117,7 @@ impl IocConfig {
                 .map(|(k, trans)| {
                     let trans_inputs = trans.needs_inputs();
                     let missing_inputs: Vec<_> =
-                        trans_inputs.difference(&known_keys).into_iter().collect();
+                        trans_inputs.difference(&known_keys).collect();
                     format!("- {}: unable to find inputs: {:?}", k, missing_inputs)
                 })
                 .collect();

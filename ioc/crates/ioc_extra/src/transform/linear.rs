@@ -1,20 +1,19 @@
 use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, task::JoinHandle};
-use tracing::warn;
+use tokio::task::JoinHandle;
+use tracing::{debug, warn};
 
-use crate::input::SimpleInput;
 
 pub struct LinearTransformConfig<'a> {
-    pub input: &'a dyn Input<f64>,
+    pub input: &'a Input<f64>,
     pub m: f64,
     pub b: f64,
 }
 
 impl LinearTransformConfig<'_> {
     pub fn from_ranges<'a>(
-        input: &'a dyn Input<f64>,
+        input: &'a Input<f64>,
         from_range: &[f64; 2],
         to_range: &[f64; 2],
     ) -> Result<LinearTransformConfig<'a>, IocBuildError> {
@@ -31,14 +30,14 @@ impl LinearTransformConfig<'_> {
 
 pub struct LinearTransform {
     pub join_handle: JoinHandle<()>,
-    pub value: SimpleInput<f64>,
+    pub value: Input<f64>,
 }
 
 impl From<LinearTransform> for TransformerI {
     fn from(ltrans: LinearTransform) -> Self {
         TransformerI {
             join_handle: ltrans.join_handle,
-            inputs: HashMap::from([("value".to_owned(), InputKind::float(ltrans.value))]),
+            inputs: HashMap::from([("value".to_owned(), InputKind::Float(ltrans.value))]),
         }
     }
 }
@@ -47,21 +46,22 @@ impl<'a> Transformer<'a> for LinearTransform {
     type Config = LinearTransformConfig<'a>;
 
     async fn try_build(cfg: &Self::Config) -> Result<Self, IocBuildError> {
-        let in_src = cfg.input.source();
-        let mut in_rx = in_src.rx;
-        let (out_tx, out_rx) = broadcast::channel(10);
-        let start = in_src.start * cfg.m + cfg.b;
-        let value = SimpleInput::new(start, out_rx);
+        let mut in_rx = cfg.input.source();
+        let start = *in_rx.borrow_and_update();
+        let start = start * cfg.m + cfg.b;
+        let (value, out_tx) = Input::new(start);
         let m = cfg.m;
         let b = cfg.b;
         let handle = tokio::spawn(async move {
-            while let Ok(new_input) = in_rx.recv().await {
+            while in_rx.changed().await.is_ok() {
+                let new_input = *in_rx.borrow_and_update();
                 let new_output = new_input * m + b;
                 if let Err(err) = out_tx.send(new_output) {
                     warn!("Error ending output! {:?}", err);
                     break;
                 }
             }
+            debug!("shutting down linear transformer!");
         });
 
         Ok(LinearTransform {

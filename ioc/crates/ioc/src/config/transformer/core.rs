@@ -25,7 +25,7 @@ impl TransformerConfig for SumTransformerConfig {
         self.inputs
             .iter()
             .for_each(|input_key| match upstream_inputs.get(input_key) {
-                Some(InputKind::Float(float)) => inputs.push(float.as_ref()),
+                Some(InputKind::Float(float)) => inputs.push(float),
                 Some(other) => errors.push(IocBuildError::from_string(format!(
                     "Expected input '{input_key}' to be a Float but got {other:?}"
                 ))),
@@ -38,11 +38,11 @@ impl TransformerConfig for SumTransformerConfig {
             return Err(IocBuildError::from_errs(errors));
         }
 
-        let cfg = SumConfig { inputs: inputs };
+        let cfg = SumConfig { inputs: &inputs };
         let sum = Sum::try_build(&cfg).await?;
         Ok(TransformerI {
-            join_handle: tokio::spawn(async move { println!("this is wrong! ") }), //todo
-            inputs: HashMap::from([("value".to_owned(), InputKind::float(sum.value))]),
+            join_handle: sum.join_handle,
+            inputs: HashMap::from([("value".to_owned(), InputKind::Float(sum.value))]),
         })
     }
 

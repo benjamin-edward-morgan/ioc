@@ -24,15 +24,15 @@ impl PipeConfig {
 
         match (input, output) {
             // If both input and output are of type String, create a new Pipe with the input and output as references.
-            (Some(InputKind::String(input)), Some(OutputKind::String(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::String(input)), Some(OutputKind::String(output))) => Ok(Pipe::new(input, output)),
             // If both input and output are of type Binary, create a new Pipe with the input and output as references.
-            (Some(InputKind::Binary(input)), Some(OutputKind::Binary(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::Binary(input)), Some(OutputKind::Binary(output))) => Ok(Pipe::new(input, output)),
             // If both input and output are of type Float, create a new Pipe with the input and output as references.
-            (Some(InputKind::Float(input)), Some(OutputKind::Float(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::Float(input)), Some(OutputKind::Float(output))) => Ok(Pipe::new(input, output)),
             // If both input and output are of type Bool, create a new Pipe with the input and output as references.
-            (Some(InputKind::Bool(input)), Some(OutputKind::Bool(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::Bool(input)), Some(OutputKind::Bool(output))) => Ok(Pipe::new(input, output)),
             // If both input and output are of type Array, create a new Pipe with the input and output as references.
-            (Some(InputKind::Array(input)), Some(OutputKind::Array(output))) => Ok(Pipe::new(input.as_ref(), output.as_ref())),
+            (Some(InputKind::Array(input)), Some(OutputKind::Array(output))) => Ok(Pipe::new(input, output)),
             // If the input and output types do not match, return an error with the mismatched types.
             (Some(input), Some(output)) => {
                 Err(

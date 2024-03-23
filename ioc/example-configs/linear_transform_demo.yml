@@ -1,0 +1,34 @@
+metadata:
+  name: linear transform demo
+  description: input in celsius, output in fahrenheit
+
+# modules expose inputs and outputs from various sources
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs:
+        celsius: 
+          Float: { start: 0.0, min: 0.0, max: 100.0, step: 1.0 }
+      outputs:
+        fahrenheit: Float
+      endpoints:
+        "/ws":
+          WebSocket: 
+            inputs: [ celsius ]
+            outputs: [ fahrenheit ]
+ 
+# transformers read from one or more inputs and produce one or more new inputs
+transformers:
+
+  temp:
+    LinearTransform:
+      input: local_server.celsius
+      from: [0.0, 100.0]
+      to: [32.0, 212.0]
+ 
+
+# pipes read from inputs and write to outputs
+pipes:
+  - { from: temp.value, to: local_server.fahrenheit}

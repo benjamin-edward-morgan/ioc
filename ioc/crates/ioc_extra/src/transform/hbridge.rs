@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, task::JoinHandle};
+use tokio::task::JoinHandle;
 use tracing::debug;
-use crate::input::SimpleInput;
 
 pub struct HBridgeConfig<'a> {
-    pub input: &'a dyn Input<f64>,
+    pub input: &'a Input<f64>,
 }
 
 pub struct HBridge {
     pub join_handle: JoinHandle<()>,
-    pub forward: SimpleInput<f64>,
-    pub reverse: SimpleInput<f64>,
-    pub enable: SimpleInput<f64>,
+    pub forward: Input<f64>,
+    pub reverse: Input<f64>,
+    pub enable: Input<f64>,
 }
 
 impl From<HBridge> for TransformerI {
@@ -21,9 +20,9 @@ impl From<HBridge> for TransformerI {
         TransformerI {
             join_handle: hbridge.join_handle,
             inputs: HashMap::from([
-                ("forward".to_owned(), InputKind::float(hbridge.forward)),
-                ("reverse".to_owned(), InputKind::float(hbridge.reverse)),
-                ("enable".to_owned(), InputKind::float(hbridge.enable)),
+                ("forward".to_owned(), InputKind::Float(hbridge.forward)),
+                ("reverse".to_owned(), InputKind::Float(hbridge.reverse)),
+                ("enable".to_owned(), InputKind::Float(hbridge.enable)),
             ]),
         }
     }
@@ -43,16 +42,16 @@ impl<'a> Transformer<'a> for HBridge {
     type Config = HBridgeConfig<'a>;
 
     async fn try_build(cfg: &HBridgeConfig<'a>) -> Result<HBridge, IocBuildError> {
-        let in_src = cfg.input.source();
-        let mut in_rx = in_src.rx;
-        let (fwd, rev, en) = hbridge_outputs(in_src.start);
-        let (fwd_tx, fwd_rx) = broadcast::channel(10);
-        let (rev_tx, rev_rx) = broadcast::channel(10);
-        let (en_tx, en_rx) = broadcast::channel(10);
+        let mut in_rx = cfg.input.source();
+        let (fwd, rev, en) = hbridge_outputs(*in_rx.borrow_and_update());
+
+        let (forward, fwd_tx) = Input::new(fwd);
+        let (reverse, rev_tx) = Input::new(rev);
+        let (enable, en_tx) = Input::new(en);
 
         let join_handle = tokio::spawn(async move {
-            while let Ok(input) = in_rx.recv().await {
-                let (fwd, rev, en) = hbridge_outputs(input);
+            while in_rx.changed().await.is_ok() {
+                let (fwd, rev, en) = hbridge_outputs(*in_rx.borrow_and_update());
                 fwd_tx.send(fwd).expect("failed to send hbridge value");
                 rev_tx.send(rev).expect("failed to send hbridge value");
                 en_tx.send(en).expect("failed to send hbridge value");
@@ -62,9 +61,9 @@ impl<'a> Transformer<'a> for HBridge {
 
         Ok(HBridge {
             join_handle,
-            forward: SimpleInput::new(fwd, fwd_rx),
-            reverse: SimpleInput::new(rev, rev_rx),
-            enable: SimpleInput::new(en, en_rx),
+            forward,
+            reverse,
+            enable,
         })
     }
 }

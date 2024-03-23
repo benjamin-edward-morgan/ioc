@@ -1,7 +1,7 @@
 //!This is the core library for the IOC project. All other IOC libraries depend on this one. This includes all fundamental data types required for a running IOC instance.
 
 use error::IocBuildError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use std::{collections::HashMap, fmt, future::Future};
 use tokio::{
     sync::{mpsc, watch},
@@ -64,12 +64,26 @@ impl<'de> Deserialize<'de> for Value {
 }
 
 impl Serialize for Value {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        //we want these to serialize without their enum wrapper
-        todo!()
+        match self {
+            Value::String(s) => ser.serialize_str(s),
+            Value::Binary(b) => ser.serialize_bytes(b),
+            Value::Float(f) => ser.serialize_f64(*f),
+            Value::Bool(b) => ser.serialize_bool(*b),
+            Value::Array(a) => {
+                let mut seq = ser.serialize_seq(Some(a.len()))?;
+                for v in a {
+                    seq.serialize_element(v)?;
+                }
+                seq.end()
+            },
+            Value::Object(o) => {
+                todo!(); //ser.serialize_map(o),
+            },
+        }
     }
 
 }

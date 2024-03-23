@@ -1,29 +1,26 @@
 
 use tokio::task::JoinHandle;
-use tokio::sync::broadcast;
-use crate::input::SimpleInput;
 use ioc_core::Input;
 use tracing::{error,debug};
 use std::marker::Send;
 
 pub struct FunctionTransformer<O: Clone + Send + 'static> {
     pub join_handle: JoinHandle<()>,
-    pub value: SimpleInput<O>,
+    pub value: Input<O>,
 }
 
-impl <O: Clone + Send + 'static> FunctionTransformer<O> {
-    pub fn new<I: Clone + Send + 'static, F: Fn(I) -> O + Send + 'static>(
-        input: &dyn Input<I>,
+impl <O: Clone + Sync + Send + 'static> FunctionTransformer<O> {
+    pub fn new<I: Clone + Sync + Send + 'static, F: Fn(I) -> O + Sync + Send + 'static>(
+        input: &Input<I>,
         function: F,
     ) -> Self {
-        let (tx, rx) = broadcast::channel(10);
-        let source = input.source();
-        let start = function(source.start);
-        let value = SimpleInput::new(start, rx);
-        let mut in_rx = source.rx;
+        let mut in_rx = input.source();
+        let start = function(in_rx.borrow_and_update().clone());
+        let (value, out_tx) = Input::new(start);
         let join_handle = tokio::spawn(async move {
-            while let Ok(x) = in_rx.recv().await {
-                if let Err(err) = tx.send(function(x)) {
+            while in_rx.changed().await.is_ok() {
+                let new_in = in_rx.borrow_and_update().clone();
+                if let Err(err) = out_tx.send(function(new_in)) {
                     error!("send error in function transformer {}", err);
                     break;
                 }

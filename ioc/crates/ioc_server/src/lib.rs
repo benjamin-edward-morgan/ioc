@@ -11,7 +11,6 @@ use ioc_core::Value;
 use tokio::join;
 use tokio::task::JoinHandle;
 use tracing::debug;
-use tracing::info;
 
 use std::net::SocketAddr;
 use tower_http::trace::DefaultMakeSpan;
@@ -121,7 +120,7 @@ impl Module for Server {
         //create the inputs and outputs
         let mut inputs = HashMap::with_capacity(cfg.inputs.len());
         let mut outputs = HashMap::with_capacity(cfg.outputs.len());
-        info!("building server io builder ...");
+        debug!("building server io builder ...");
 
         let io_builder = ServerIoBuilder {
             cmd_tx: cmd_tx.clone(),

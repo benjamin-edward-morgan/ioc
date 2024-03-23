@@ -1,88 +1,70 @@
 metadata:
-  name: pid demo 
-  description: demo where magnetometer heading controls steering and camera pan - requires raspberry pi with devices
+  name: pid demo
+  description: demo of a PID controller controlling a dampened oscillator. osillator parameters and pid parameters are updatable.
 
-# modules expose inputs and outputs from various sources
 modules:
   local_server: 
     Server:
       port: 8080
       root_context: /
       inputs:
+        m:
+          Float: { start: 1.0, min: 0.01, max: 10.0, step: 0.01 }
+        c:
+          Float: { start: 1.0, min: 0.00, max: 10.0, step: 0.01 }
+        k:
+          Float: { start: 1.0, min: 0.00, max: 10.0, step: 0.01 }
         p: 
           Float: { start: 1.0, min: 0.0, max: 10.0, step: 0.01 }
         i: 
-          Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
+          Float: { start: 1.0, min: 0.0, max: 10.0, step: 0.01 }
         d: 
           Float: { start: 0.0, min: 0.0, max: 10.0, step: 0.01 }
-        heading_target: 
-          Float: { start: 0.0, min: -3.14, max: 3.14, step: 0.0001}
+        set_point: 
+          Float: { start: 0.0, min: -10.0, max: 10.0, step: 0.01}
       outputs:
-        heading: Float
-      endpoints:
+        process_var: Float
+        force: Float
+      endpoints: 
         "/ws":
           WebSocket: 
-            inputs: [ heading_target, p, i, d ]
-            outputs: [ heading ]
-  pwm:
-    Pca9685:
-      i2c_bus: 0
-      i2c_address: 0x40
-      channels:
-        pan_servo: 0
-        tilt_servo: 1
-        steer_enable: 7
-        steer_left: 8
-        steer_right: 9
+            inputs: [ p, i, d, m, c, k, set_point ]
+            outputs: [ process_var, force ]
 
-  mag_accel:
-    Lsm303dlhc: {}
+  feedback:
+    Feedback:
+      items:
+        process_var: 
+          Float:
+            start: 0.0
 
-# transformers read from one or more inputs and produce one or more new inputs
 transformers:
 
-  heading:
-    Heading:
-      input: mag_accel.magnetometer
-
-  steer_pid:
+  pid:
     PID:
       p: local_server.p
       i: local_server.i
-      d: local_server.d 
-      set_point: local_server.heading_target
-      process_var: heading.value
-      period_ms: 100
-
-  steer_clamp:
+      d: local_server.d
+      set_point: local_server.set_point 
+      process_var: feedback.process_var
+      period_ms: 100 
+  
+  pid_clamped:
     Clamp:
-      min: -1.0
-      max: 1.0
-      input: steer_pid.value
+      input: pid.value
+      min: -10.0
+      max: 10.0
 
-  steer_hbridge:
-    HBridge:
-      input: steer_clamp.value
+  spring:
+    DampedOscillator:
+      m: local_server.m
+      c: local_server.c
+      k: local_server.k
+      f: pid_clamped.value
+      period_ms: 50
+      steps_per_frame: 100
 
-  pan_servo:
-    LinearTransform:
-      input: steer_pid.value
-      from: [-1.57, 1.57] 
-      to: [ 0.15, 0.05 ]
-
-  pan_clamp:
-    Clamp:
-      input: pan_servo.value
-      min: 0.05
-      max: 0.15
-
-# pipes read from inputs and write to outputs
 pipes:
-
-  - { from: steer_hbridge.forward, to: pwm.steer_left}
-  - { from: steer_hbridge.reverse, to: pwm.steer_right }
-  - { from: steer_hbridge.enable, to: pwm.steer_enable }
-
-  - { from: heading.value, to: local_server.heading }
-
-  - { from: pan_clamp.value, to: pwm.pan_servo }
+  - { from: spring.x, to: local_server.process_var }
+  - { from: spring.x, to: feedback.process_var }
+  - { from: pid_clamped.value, to: local_server.force }

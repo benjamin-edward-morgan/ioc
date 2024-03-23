@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, Input, InputKind, Transformer, TransformerI};
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::{sync::watch, task::JoinHandle, time::sleep};
 use tracing::debug;
 use std::time::{Instant,Duration};
-use crate::input::SimpleInput;
 
 #[derive(Clone)]
 pub struct LimiterParams {
@@ -32,13 +31,13 @@ impl Default for LimiterParams {
 }
 
 pub struct LimiterFilterConfig<'a> {
-    pub input: &'a dyn Input<f64>,
+    pub input: &'a Input<f64>,
     pub params: LimiterParams,
 }
 
 pub struct Limiter {
     pub join_handle: JoinHandle<()>,
-    pub value: SimpleInput<f64>,
+    pub value: Input<f64>,
 }
 
 impl From<Limiter> for TransformerI {
@@ -46,7 +45,7 @@ impl From<Limiter> for TransformerI {
         TransformerI{
             join_handle: limiter.join_handle,
             inputs: HashMap::from([
-                ("value".to_owned(), InputKind::float(limiter.value))
+                ("value".to_owned(), InputKind::Float(limiter.value))
             ]),
         }
     }
@@ -72,7 +71,7 @@ impl State {
             return Err(IocBuildError::message("must have ddmin < ddmax and non NaN values in limiter"));
         }
         let x = start.max(params.min).min(params.max);
-        Ok(State{target: x, x: x, dx: 0.0, ddx: 0.0, last_time: Instant::now()})
+        Ok(State{target: x, x, dx: 0.0, ddx: 0.0, last_time: Instant::now()})
     }
 
     fn step(&mut self, params: &LimiterParams) -> f64 {
@@ -100,13 +99,11 @@ impl State {
                     self.x = self.target;
                     self.dx = 0.0;
                     self.ddx = 0.0;
+                } else if t1 < 0.0001 {
+                    //skip the accel period 
+                    self.ddx = deccel;
                 } else {
-                    if t1 < 0.0001 {
-                        //skip the accel period 
-                        self.ddx = deccel;
-                    } else {
-                        self.ddx = accel;
-                    }
+                    self.ddx = accel;
                 }
             } else {
                 //we are going to overshoot. deccelerate anyway
@@ -181,30 +178,27 @@ mod tests {
 }
 
 
-
-
-
-
 fn spawn_limiter_task(
     mut state: State, 
     params: &LimiterParams, 
-    mut rx: broadcast::Receiver<f64>,
-    tx: broadcast::Sender<f64>
+    mut rx: watch::Receiver<f64>,
+    tx: watch::Sender<f64>
 ) -> JoinHandle<()> {
     let params = params.clone();
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 _ = sleep(Duration::from_millis(params.period_ms)) => {},
-                in_res = rx.recv() => {
-                    if let Ok(new_in) = in_res {
+                in_res = rx.changed() => {
+                    if in_res.is_ok() {
+                        let new_in = *rx.borrow_and_update();
                         state.target = new_in;
                     } else {
                         break;
                     }
                 }
             }
-            if let Err(_) = tx.send(state.step(&params)) {
+            if tx.send(state.step(&params)).is_err() {
                 break;
             }
         }
@@ -218,12 +212,10 @@ impl<'a> Transformer<'a> for Limiter {
     async fn try_build(cfg: &LimiterFilterConfig<'a>) -> Result<Limiter, IocBuildError> {
 
         let params = &cfg.params;
-        let in_src = cfg.input.source();
-        let in_rx = in_src.rx;
-        let start = in_src.start;
+        let mut in_rx = cfg.input.source();
+        let start = *in_rx.borrow_and_update();
         let state = State::initial(start, params)?;
-        let (out_tx, out_rx) = broadcast::channel(10);
-        let value = SimpleInput::new(start, out_rx);
+        let (value, out_tx) = Input::new(start);
 
         let join_handle = spawn_limiter_task(state, params, in_rx, out_tx);
 

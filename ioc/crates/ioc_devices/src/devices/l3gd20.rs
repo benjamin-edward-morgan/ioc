@@ -1,12 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
 use embedded_hal::i2c;
-use ioc_core::{error::IocBuildError, InputKind, ModuleBuilder, ModuleIO, Value};
+use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO, Value};
 use serde::Deserialize;
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::{sync::watch, task::JoinHandle, time::sleep};
 use tracing::{error, info, warn};
-
-use super::VectorInput;
 
 pub enum DataRate {
     Low0,
@@ -77,7 +75,7 @@ impl Default for L3gd20DeviceConfig {
 
 pub struct L3gd20Device {
     pub join_handle: JoinHandle<()>,
-    pub gyroscope: VectorInput,
+    pub gyroscope: Input<Vec<Value>>,
 }
 
 impl L3gd20Device {
@@ -112,13 +110,13 @@ impl L3gd20Device {
             );
         }
 
-        let (tx, rx) = broadcast::channel(10);
+        let (gyro, tx) = Input::new(Vec::new());
 
         let join_handle = spawn_gyro_task(config.i2c_address, tx, i2c);
 
         Ok(Self {
             join_handle: join_handle,
-            gyroscope: VectorInput::new(rx),
+            gyroscope: gyro,
         })
     }
 }
@@ -127,7 +125,7 @@ impl From<L3gd20Device> for ModuleIO {
     fn from(dev: L3gd20Device) -> ModuleIO {
         ModuleIO {
             join_handle: dev.join_handle,
-            inputs: HashMap::from([("value".to_string(), InputKind::array(dev.gyroscope))]),
+            inputs: HashMap::from([("value".to_string(), InputKind::Array(dev.gyroscope))]),
             outputs: HashMap::new(),
         }
     }
@@ -179,7 +177,7 @@ fn ctrl1_register_value(dr: &DataRate, bw: u8, enabled: bool) -> u8 {
 
 fn spawn_gyro_task<I2C>(
     i2c_address: u8,
-    tx: broadcast::Sender<Vec<Value>>,
+    tx: watch::Sender<Vec<Value>>,
     mut i2c: I2C,
 ) -> JoinHandle<()>
 where
