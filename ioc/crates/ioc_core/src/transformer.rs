@@ -86,7 +86,7 @@ fn spawn_sum_task(inputs: &[&Input<f64>]) -> (Input<f64>, JoinHandle<()>) {
                     break;
                 }
             }
-            debug!("shutting down sum source task {idx} !")
+            debug!("shutting down sum source task {idx}!")
         });
         join_handles.push(handle);
     }

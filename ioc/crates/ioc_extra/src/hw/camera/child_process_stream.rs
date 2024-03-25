@@ -1,6 +1,7 @@
 use std::process::Stdio;
 use tokio::process::{ChildStdout, Command};
-use tracing::{error, info};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error};
 
 #[derive(Debug)]
 pub struct ChildProcessError {
@@ -27,9 +28,9 @@ pub fn start_child_process<O>(
     cmd: &str,
     args: &[&str],
     stream_handler: fn(ChildStdout) -> O,
-    // kill_switch: impl Future<Output = ()> + Send + 'static,
+    cancel_token: CancellationToken,
 ) -> Result<O, ChildProcessError> {
-    info!("spawing child process ... [{} {}]", cmd, args.join(" "));
+    debug!("spawing child process ... [{} {}]", cmd, args.join(" "));
     let mut child = Command::new(cmd)
         .args(args)
         .stderr(Stdio::inherit())
@@ -40,19 +41,19 @@ pub fn start_child_process<O>(
         "Unable to open stdout stream from child priocess",
     ))?;
 
-    info!("creating stream handler for child process ...");
+    debug!("creating stream handler for child process ...");
     let output = stream_handler(child_out);
 
-    info!("waiting for child process to exit ...");
+    debug!("waiting for child process to exit ...");
     tokio::spawn(async move {
         tokio::select! {
             child_res = child.wait() => {
                 error!("child process exited unexpectedly! {:?}", child_res);
             },
-            // _ = kill_switch => {
-            //     info!("killing child process ...");
-            //     child.kill().await.unwrap();
-            // }
+            _ = cancel_token.cancelled() => {
+                debug!("killing child process ...");
+                child.kill().await.unwrap();
+            }
         }
     });
 

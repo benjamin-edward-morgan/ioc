@@ -694,6 +694,7 @@ dependencies = [
  "pwm-pca9685",
  "serde",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -723,6 +724,7 @@ dependencies = [
  "rppal",
  "serde",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

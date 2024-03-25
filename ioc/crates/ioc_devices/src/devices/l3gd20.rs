@@ -4,7 +4,8 @@ use embedded_hal::i2c;
 use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO, Value};
 use serde::Deserialize;
 use tokio::{sync::watch, task::JoinHandle, time::sleep};
-use tracing::{error, info, warn};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, info, warn};
 
 pub enum DataRate {
     Low0,
@@ -79,7 +80,7 @@ pub struct L3gd20Device {
 }
 
 impl L3gd20Device {
-    pub fn try_build<I2C>(config: &L3gd20DeviceConfig, mut i2c: I2C) -> Result<Self, IocBuildError>
+    pub fn try_build<I2C>(config: &L3gd20DeviceConfig, mut i2c: I2C, cancel_token: CancellationToken) -> Result<Self, IocBuildError>
     where
         I2C: i2c::I2c + Send + 'static,
     {
@@ -112,7 +113,7 @@ impl L3gd20Device {
 
         let (gyro, tx) = Input::new(Vec::new());
 
-        let join_handle = spawn_gyro_task(config.i2c_address, tx, i2c);
+        let join_handle = spawn_gyro_task(config.i2c_address, tx, i2c, cancel_token);
 
         Ok(Self {
             join_handle: join_handle,
@@ -157,8 +158,8 @@ where
     type Config = L3gd20DeviceConfig;
     type Module = L3gd20Device;
 
-    async fn try_build(&self, cfg: &L3gd20DeviceConfig) -> Result<L3gd20Device, IocBuildError> {
-        L3gd20Device::try_build(cfg, (self.i2c_bus_provider)(1))
+    async fn try_build(&self, cfg: &L3gd20DeviceConfig, cancel_token: CancellationToken) -> Result<L3gd20Device, IocBuildError> {
+        L3gd20Device::try_build(cfg, (self.i2c_bus_provider)(1), cancel_token)
     }
 }
 
@@ -179,6 +180,7 @@ fn spawn_gyro_task<I2C>(
     i2c_address: u8,
     tx: watch::Sender<Vec<Value>>,
     mut i2c: I2C,
+    cancel_token: CancellationToken
 ) -> JoinHandle<()>
 where
     I2C: i2c::I2c + Send + 'static,
@@ -202,16 +204,18 @@ where
             &mut buffer,
         )
         .unwrap();
-        info!("CTRL bytes!: {:02X?}", buffer);
 
         loop {
+            if cancel_token.is_cancelled() {
+                break;
+            }
             let mut buffer = [0u8; 8];
             if let Err(err) = i2c.write_read(
                 i2c_address,
                 &[OUT_TEMP_REGISTER | MULTI_READ_MASK],
                 &mut buffer,
             ) {
-                error!("Error reading gyroscope data! {:?}", err);
+                error!("error reading gyroscope data! {:?}", err);
                 break;
             }
 
@@ -219,21 +223,21 @@ where
             let y = scale.scale_output_dps(((buffer[5] as i16) << 8) | (buffer[4] as i16));
             let z = scale.scale_output_dps(((buffer[7] as i16) << 8) | (buffer[6] as i16));
 
-            tx.send(vec![Value::Float(x), Value::Float(y), Value::Float(z)])
-                .unwrap();
-
-            // println!("temp, status, gyro data! {:02X?}", buffer);
-            // info!("gyro! {} {} {}", x, y, z);
+            if let Err(err) = tx.send(vec![Value::Float(x), Value::Float(y), Value::Float(z)]) {
+                warn!("error sending gyroscope data! {:?}", err);
+                break;
+            }
 
             sleep(Duration::from_millis((1000.0 / dr.odr_hertz()) as u64)).await;
         }
 
+        debug!("shutting down gyro!");
+
         let ctrl1 = ctrl1_register_value(&dr, 0, false);
-        if let Err(err) = i2c.write(i2c_address, &[CTRL1_REGISTER, ctrl1]) {
-            warn!("error setting control! {:?}", err);
-            panic!("gyro not working");
+        match i2c.write(i2c_address, &[CTRL1_REGISTER, ctrl1]) {
+            Ok(_) => debug!("successfullt disabled gyro on shutdown"),
+            Err(err) => warn!("error disabling gyro on shutdown! {:?}", err),
         }
 
-        info!("shutting down gyro!");
     })
 }

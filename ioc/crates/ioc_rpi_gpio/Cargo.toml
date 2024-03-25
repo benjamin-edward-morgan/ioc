@@ -13,6 +13,7 @@ embedded-hal = { version = "1.0.0-rc.2", optional = true }
 
 tracing.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 serde.workspace = true
 futures.workspace = true
 futures-util.workspace = true

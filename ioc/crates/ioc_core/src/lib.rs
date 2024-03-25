@@ -215,6 +215,7 @@ pub trait ModuleBuilder {
     fn try_build(
         &self,
         cfg: &Self::Config,
+        cancel_token: CancellationToken,
     ) -> impl Future<Output = Result<Self::Module, IocBuildError>>;
 }
 

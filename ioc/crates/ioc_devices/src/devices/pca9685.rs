@@ -9,6 +9,7 @@ use ioc_core::{error::IocBuildError, ModuleBuilder, ModuleIO, Output, OutputKind
 use pwm_pca9685::{Address, Channel, Pca9685};
 use serde::Deserialize;
 use tokio::{sync::mpsc, task::JoinHandle};
+use tokio_util::sync::CancellationToken;
 
 use crate::error::DeviceConfigError;
 
@@ -59,7 +60,8 @@ where
 fn spawn_pca_output_task<I2C, E>(
     device: Arc<Mutex<Pca9685<I2C>>>,
     channel: u8,
-    mut tx: mpsc::Receiver<f64>
+    mut rx: mpsc::Receiver<f64>,
+    cancel_token: CancellationToken,
 ) -> JoinHandle<()> 
 where
         E: std::fmt::Debug,
@@ -67,14 +69,29 @@ where
 {
     tokio::spawn(async move {
         let chann = Channel::try_from(channel).unwrap();
-        while let Some(new_value) = tx.recv().await {
-            let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
-            let mut device = match device.lock() {
-                Ok(device) => device,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            if let Err(err) = device.set_channel_on_off(chann, 0, off_time) {
-                error!("error setting PCA9685 device output! {:?}", err);
+        loop {
+            tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    break;
+                },
+                rx_res = rx.recv() => { 
+                    match rx_res {
+                        Some(new_value) => {
+                            let off_time = (new_value.min(1.0).max(0.0) * 4095.0) as u16;
+                            let mut device = match device.lock() {
+                                Ok(device) => device,
+                                Err(poisoned) => poisoned.into_inner(),
+                            };
+                            if let Err(err) = device.set_channel_on_off(chann, 0, off_time) {
+                                error!("error setting PCA9685 device output! {:?}", err);
+                                break;
+                            }
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                },
             }
         }
         debug!("Pca9685Device output task for channel {} shutting down.", channel)
@@ -85,6 +102,7 @@ impl Pca9685Device {
     pub fn build<I2C, E>(
         config: &Pca9685DeviceConfig,
         i2c: I2C,
+        cancel_token: CancellationToken,
     ) -> Result<Pca9685Device, DeviceConfigError>
     where
         E: std::fmt::Debug,
@@ -102,14 +120,23 @@ impl Pca9685Device {
         let mut join_handles: Vec<JoinHandle<()>> = Vec::with_capacity(config.channels.len());
         for (k, c) in &config.channels {
             let (output, out_rx) = Output::new();
-            let join_handle = spawn_pca_output_task(device.clone(), *c, out_rx);
+            let join_handle = spawn_pca_output_task(device.clone(), *c, out_rx, cancel_token.clone());
             channels.insert(k.to_string(), output);
             join_handles.push(join_handle);
         }
 
         let join_handle = tokio::spawn(async move {
             join_all(join_handles).await;
-            debug!("pca 9685 tasks all done!")
+            debug!("pca 9685 tasks all done!");
+
+            let mut dev = match device.lock() {
+                Ok(device) => device,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            match dev.disable() {
+                Ok(_) => debug!("PCA9685 device disabled"),
+                Err(err) => error!("Error disabling PCA9685 device: {:?}", err),
+            }
         });
 
         Ok(Pca9685Device {
@@ -148,9 +175,9 @@ where
     type Config = Pca9685DeviceConfig;
     type Module = Pca9685Device;
 
-    async fn try_build(&self, cfg: &Pca9685DeviceConfig) -> Result<Pca9685Device, IocBuildError> {
+    async fn try_build(&self, cfg: &Pca9685DeviceConfig, cancel_token: CancellationToken) -> Result<Pca9685Device, IocBuildError> {
         let i2c = (self.i2c_bus_provider)(1);
-        let dev = Pca9685Device::build(cfg, i2c)?;
+        let dev = Pca9685Device::build(cfg, i2c, cancel_token)?;
         Ok(dev)
     }
 }
