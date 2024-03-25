@@ -4,7 +4,7 @@ use axum::{body::Body, response::Response, routing::get, Router};
 use futures_util::{Stream, StreamExt};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio_stream::wrappers::WatchStream;
-use tracing::warn;
+use tracing::debug;
 
 use crate::server::state::{ServerOutputState, StateCmd};
 
@@ -42,7 +42,7 @@ impl MjpegStreamEndpoint {
                         .expect("could not send frame to watch")
                 }
             }
-            warn!("mjpeg stream task shutting down!");
+            debug!("mjpeg stream task shutting down!");
         });
 
         MjpegStreamEndpoint { frames }

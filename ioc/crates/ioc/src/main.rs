@@ -2,7 +2,6 @@ pub mod config;
 
 use config::IocConfig;
 use config_rs::{Config, File};
-use tokio::signal::unix::{signal, SignalKind};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

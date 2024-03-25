@@ -4,7 +4,8 @@ use embedded_hal::i2c;
 use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO};
 use serde::Deserialize;
 use tokio::{sync::watch, task::JoinHandle, time::sleep};
-use tracing::error;
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error};
 
 #[derive(Deserialize, Clone, Copy, Debug)]
 pub enum PressurePrecision {
@@ -80,8 +81,8 @@ where
     type Config = Bmp180DeviceConfig;
     type Module = Bmp180Device;
 
-    async fn try_build(&self, cfg: &Bmp180DeviceConfig) -> Result<Bmp180Device, IocBuildError> {
-        Bmp180Device::build(cfg, (self.i2c_bus_provider)(1))
+    async fn try_build(&self, cfg: &Bmp180DeviceConfig, cancel_token: CancellationToken) -> Result<Bmp180Device, IocBuildError> {
+        Bmp180Device::build(cfg, (self.i2c_bus_provider)(1), cancel_token)
     }
 }
 
@@ -198,6 +199,7 @@ fn spawn_sensor_read_task<I2C>(
     calib: Bmp180CalibrationData,
     pressure_precision: PressurePrecision,
     period_ms: u64,
+    cancel_token: CancellationToken,
 ) -> JoinHandle<()>
 where
     I2C: i2c::I2c + Send + 'static,
@@ -208,7 +210,7 @@ where
         PressurePrecision::HighResolution => (2u8, MEASURE_PRESS_OSS_2, PRESS_2_WAIT),
         PressurePrecision::UltraHighResolution => (3u8, MEASURE_PRESS_OSS_3, PRESS_3_WAIT),
     };
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         loop {
             let mut buffer: [u8; 2] = [0u8; 2];
 
@@ -259,11 +261,18 @@ where
             let delay: tokio::time::Sleep = sleep(Duration::from_millis(period_ms));
             delay.await;
         }
+        debug!("bmp180 sensor read task done!");
+    });
+
+    tokio::spawn(async move {
+        cancel_token.cancelled().await;
+        debug!("stopping bmp180 sensor read task");
+        task.abort();
     })
 }
 
 impl Bmp180Device {
-    pub fn build<I2C>(config: &Bmp180DeviceConfig, mut i2c: I2C) -> Result<Self, IocBuildError>
+    pub fn build<I2C>(config: &Bmp180DeviceConfig, mut i2c: I2C, cancel_token: CancellationToken) -> Result<Self, IocBuildError>
     where
         I2C: i2c::I2c + Send + 'static,
     {
@@ -292,6 +301,7 @@ impl Bmp180Device {
                 calib,
                 config.pressure_precision,
                 config.period_ms,
+                cancel_token,
             );
 
             Ok(Self {

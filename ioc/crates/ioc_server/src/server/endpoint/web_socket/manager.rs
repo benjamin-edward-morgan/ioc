@@ -4,7 +4,7 @@ use crate::server::state::StateCmd;
 use axum::extract::ws::WebSocket;
 use std::collections::HashSet;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 pub(crate) struct WebSocketManager {
     pub websocket_tx: mpsc::Sender<WebSocket>,

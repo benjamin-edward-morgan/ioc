@@ -6,7 +6,8 @@ use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO, 
 use lsm303dlhc::Lsm303dlhc;
 use serde::Deserialize;
 use tokio::{task::JoinHandle, time::sleep};
-use tracing::warn;
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, warn};
 
 #[derive(Deserialize, Debug)]
 pub struct Lsm303dlhcDeviceConfig {}
@@ -18,7 +19,7 @@ pub struct Lsm303dlhcDevice {
 }
 
 impl Lsm303dlhcDevice {
-    pub fn try_build<I2C, E>(_cfg: &Lsm303dlhcDeviceConfig, i2c: I2C) -> Result<Self, E>
+    pub fn try_build<I2C, E>(_cfg: &Lsm303dlhcDeviceConfig, i2c: I2C, cancel_token: CancellationToken) -> Result<Self, E>
     where
         E: std::fmt::Debug,
         I2C: i2c::Write<Error = E> + i2c::WriteRead<Error = E> + Send + 'static,
@@ -36,6 +37,9 @@ impl Lsm303dlhcDevice {
 
         let join_handle = tokio::spawn(async move {
             loop {
+                if cancel_token.is_cancelled() {
+                    break;
+                }
                 match device.accel() {
                     Ok(accel) => {
                         let vector = (
@@ -74,6 +78,8 @@ impl Lsm303dlhcDevice {
                 }
                 sleep(Duration::from_millis(100)).await;
             }
+
+            debug!("shutting down lsm303dlhc!");
         });
 
         Ok(Self {
@@ -132,8 +138,8 @@ where
     type Config = Lsm303dlhcDeviceConfig;
     type Module = Lsm303dlhcDevice;
 
-    async fn try_build(&self, cfg: &Self::Config) -> Result<Self::Module, IocBuildError> {
-        Lsm303dlhcDevice::try_build(cfg, (self.i2c_bus_provider)(1)).map_err(|err| {
+    async fn try_build(&self, cfg: &Self::Config, cancel_token: CancellationToken) -> Result<Self::Module, IocBuildError> {
+        Lsm303dlhcDevice::try_build(cfg, (self.i2c_bus_provider)(1), cancel_token).map_err(|err| {
             IocBuildError::from_string(format!("Error building Lsm303dlhc device: {:?}", err))
         })
     }

@@ -81,22 +81,22 @@ impl IocModuleConfig {
             //devices
             #[cfg(feature = "devices")]
             Self::Pca9685(pca9685_config) => Pca9685DeviceBuilder::new(i2c_bus_provider)
-                .try_build(pca9685_config)
+                .try_build(pca9685_config, cancel_token)
                 .await
                 .map(|outputs| outputs.into()),
             #[cfg(feature = "devices")]
             Self::Bmp180(bmp180_config) => Bmp180DeviceBuilder::new(i2c_bus_provider)
-                .try_build(bmp180_config)
+                .try_build(bmp180_config, cancel_token)
                 .await
                 .map(|sensor| sensor.into()),
             #[cfg(feature = "devices")]
             Self::L3dg20(l3dg20_cfg) => L3gd20DeviceBuilder::new(i2c_bus_provider)
-                .try_build(l3dg20_cfg)
+                .try_build(l3dg20_cfg, cancel_token)
                 .await
                 .map(|sensor| sensor.into()),
             #[cfg(feature = "devices")]
             Self::Lsm303dlhc(lsm303dlhc_cfg) => Lsm303dlhcDeviceBuilder::new(i2c_bus_provider)
-                .try_build(lsm303dlhc_cfg)
+                .try_build(lsm303dlhc_cfg, cancel_token)
                 .await
                 .map(|sensor| sensor.into()),
             

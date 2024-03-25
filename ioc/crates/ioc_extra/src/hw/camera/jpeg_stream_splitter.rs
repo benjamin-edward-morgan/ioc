@@ -1,7 +1,7 @@
 use crate::hw::camera::image::JpegImage;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::debug;
 
 enum SplitJpegState {
     Marker1,      //looking for 0xFF
@@ -121,7 +121,7 @@ pub fn split_jpegs(
                 break;
             }
         }
-        info!("child process stream ended.")
+        debug!("child process stream ended.")
     });
 
     rx

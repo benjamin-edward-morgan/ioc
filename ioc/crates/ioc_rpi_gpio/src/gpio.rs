@@ -4,6 +4,7 @@ use ioc_core::{error::IocBuildError, Input, InputKind, Module, ModuleIO, Output,
 use rppal::gpio::{Level, Trigger};
 use serde::Deserialize;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 use futures_util::future::join_all;
 use crate::error::GpioError;
@@ -71,6 +72,7 @@ fn spawn_gpio_digital_out(gpio: &rppal::gpio::Gpio, pin: u8) -> Result<(Output<b
             pin.write(level);
         }
         debug!("gpio digital out shutting down");
+        pin.set_low();
     });
 
     Ok((output, handle))
@@ -91,6 +93,7 @@ fn spawn_gpio_soft_pwm_out(gpio: &rppal::gpio::Gpio, pin: u8, frequency: f64) ->
             }
         }
         debug!("soft pwm out shutting down");
+        pin.set_low();
     });
 
     Ok((output, handle))
@@ -100,7 +103,7 @@ fn spawn_gpio_soft_pwm_out(gpio: &rppal::gpio::Gpio, pin: u8, frequency: f64) ->
 impl Module for Gpio {
     type Config = GpioConfig;
 
-    async fn try_build(cfg: &GpioConfig) -> Result<Self, IocBuildError> {
+    async fn try_build(cfg: &GpioConfig, _cancel_token: CancellationToken) -> Result<Self, IocBuildError> {
         let mut inputs = HashMap::new();
         let mut outputs = HashMap::new();
         let mut join_handles = Vec::new();

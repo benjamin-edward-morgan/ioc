@@ -19,7 +19,7 @@ use tracing::warn;
 use self::{child_process_stream::ChildProcessError, image::JpegImage};
 
 
-fn start_mjpeg_stream() -> Result<broadcast::Receiver<Option<JpegImage>>, ChildProcessError> {
+fn start_mjpeg_stream(cancel_token: CancellationToken) -> Result<broadcast::Receiver<Option<JpegImage>>, ChildProcessError> {
     let args = [
         "--rotation",
         "180",
@@ -48,6 +48,7 @@ fn start_mjpeg_stream() -> Result<broadcast::Receiver<Option<JpegImage>>, ChildP
         "libcamera-vid",
         &args,
         split_jpegs,
+        cancel_token,
     )
 }
 
@@ -78,7 +79,7 @@ impl Module for Camera {
         let (mjpeg, frame_tx) = Input::new(Vec::new());
 
         let join_handle = tokio::spawn(async move {
-            match start_mjpeg_stream() {
+            match start_mjpeg_stream(cancel_token) {
                 Ok(mut jpeg_rx) => {
                     while let Ok(jpeg) = jpeg_rx.recv().await {
                         if let Some(jpeg) = jpeg {
