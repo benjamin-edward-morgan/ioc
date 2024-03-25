@@ -1,4 +1,4 @@
-use ioc_core::{error::IocBuildError, feedback::{Feedback, FeedbackConfig}, Module, ModuleBuilder, ModuleIO};
+use ioc_core::{error::IocBuildError, feedback::{Feedback, FeedbackConfig}, Module, ModuleIO};
 use serde::Deserialize;
 
 //ioc_server
@@ -17,10 +17,13 @@ use ioc_devices::devices::{
     lsm303dlhc::{Lsm303dlhcDeviceBuilder, Lsm303dlhcDeviceConfig},
     pca9685::{Pca9685DeviceBuilder, Pca9685DeviceConfig},
 };
+#[cfg(feature = "devices")]
+use ioc_core::ModuleBuilder;
+
 
 //rpi (for i2c source)
 #[cfg(feature = "rpi")]
-use ioc_rpi_gpio::rppal::i2c::I2c;
+use ioc_rpi_gpio::{I2c, gpio::{Gpio, GpioConfig}};
 
 #[cfg(feature = "rpi")]
 fn i2c_bus_provider(bus: u8) -> I2c {
@@ -50,6 +53,10 @@ pub enum IocModuleConfig {
     L3dg20(L3gd20DeviceConfig),
     #[cfg(feature = "devices")]
     Lsm303dlhc(Lsm303dlhcDeviceConfig),
+
+    //rpi 
+    #[cfg(feature = "rpi")]
+    Gpio(GpioConfig),
 }
 
 impl IocModuleConfig {
@@ -91,6 +98,10 @@ impl IocModuleConfig {
                 .try_build(lsm303dlhc_cfg)
                 .await
                 .map(|sensor| sensor.into()),
+            
+            //rpi
+            #[cfg(feature = "rpi")]
+            Self::Gpio(gpio_config) => Gpio::try_build(gpio_config).await.map(|gpio| gpio.into()),
         }
     }
 }

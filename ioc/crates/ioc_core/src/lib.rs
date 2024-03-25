@@ -1,7 +1,7 @@
 //!This is the core library for the IOC project. All other IOC libraries depend on this one. This includes all fundamental data types required for a running IOC instance.
 
 use error::IocBuildError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
+use serde::{de::Visitor, ser::SerializeSeq, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::HashMap, fmt, future::Future};
 use tokio::{
     sync::{mpsc, watch},
@@ -53,14 +53,60 @@ pub enum Value {
 }
 
 impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D>(_deserializer: D) -> Result<Value, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Value, D::Error>
     where
         D: Deserializer<'de>,
     {
-        //we want these to deserialize without their enum wrapper
-        todo!()
+        deserializer.deserialize_any(ValueVisitor)
+    }
+}
+
+struct ValueVisitor; 
+
+impl <'a> Visitor<'a> for ValueVisitor {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("")
     }
 
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(Value::String(v.to_string()))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E> {
+        Ok(Value::Binary(v.to_vec()))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
+        Ok(Value::Float(v))
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
+        Ok(Value::Bool(v))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'a>,
+    {
+        let mut vec = Vec::new();
+        while let Some(value) = seq.next_element()? {
+            vec.push(value);
+        }
+        Ok(Value::Array(vec))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'a>,
+    {
+        let mut obj = HashMap::new();
+        while let Some((key, value)) = map.next_entry()? {
+            obj.insert(key, value);
+        }
+        Ok(Value::Object(obj))
+    }
 }
 
 impl Serialize for Value {
@@ -81,11 +127,14 @@ impl Serialize for Value {
                 seq.end()
             },
             Value::Object(o) => {
-                todo!(); //ser.serialize_map(o),
+                let mut obj = ser.serialize_map(Some(o.len()))?;
+                for (k, v) in o {
+                    obj.serialize_entry(k, v)?;
+                }
+                obj.end()
             },
         }
     }
-
 }
 
 ///Fundamental `Input` kinds when using configuration.

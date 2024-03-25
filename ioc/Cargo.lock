@@ -715,6 +715,8 @@ version = "0.0.1"
 dependencies = [
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
+ "futures",
+ "futures-util",
  "ioc_core",
  "rppal",
  "serde",
