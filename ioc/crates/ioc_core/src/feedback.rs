@@ -30,9 +30,9 @@ pub struct FeedbackConfig {
 /// 
 /// The join_handles of each feedback_pipe are joined together and awaited in the Feedback module's join_handle.
 pub struct Feedback {
-    join_handle: JoinHandle<()>,
-    inputs: HashMap<String, InputKind>,
-    outputs: HashMap<String, OutputKind>,
+    pub join_handle: JoinHandle<()>,
+    pub inputs: HashMap<String, InputKind>,
+    pub outputs: HashMap<String, OutputKind>,
 }
 
 impl From<Feedback> for ModuleIO {

@@ -1,35 +1,21 @@
+//!This library provides access to the Raspberry Pi GPIO pins. It is a wrapper around the rppal library.
+//! 
+//! The `get_bus` and `get_default_bus` functions can get an I2C bus instance that can be used to construct modules in `ioc_devices`
+
+//internal error type for rpi gpio
 pub mod error;
-// pub mod input;
-// pub mod output;
 
-use crate::error::BuildError;
-pub use rppal;
-use rppal::{gpio::Gpio, i2c::I2c};
-use tracing::info;
+//module to use bare gpio pins as inputs and outputs
+pub mod gpio;
 
-pub struct RpiGpioConfig {
-    pub channel_size: u16,
-}
+pub use rppal::i2c::I2c;
 
-pub struct RpiGpio {
-    channel_size: u16,
-    gpio: Gpio,
-}
-
-impl RpiGpio {
-    pub fn try_build(cfg: &RpiGpioConfig) -> Result<Self, BuildError> {
-        let gpio = Gpio::new()?;
-
-        Ok(RpiGpio {
-            channel_size: cfg.channel_size,
-            gpio,
-        })
-    }
-}
-
+//get i2c bus by id
 pub fn get_bus(bus: u8) -> I2c {
-    //I2c::with_bus(bus).unwrap()
-    let i2c = I2c::new().unwrap();
-    info!("i2c bus: {}", i2c.bus());
-    i2c
+    I2c::with_bus(bus).unwrap()
+}
+
+//get default i2c bus
+pub fn get_default_bus() -> I2c {
+    I2c::new().unwrap()
 }

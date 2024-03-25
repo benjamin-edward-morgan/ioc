@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 default = [ "server", "extra", "sims" ]
-all = [ "default", "rpi", "devices", "extra", "sims" ]
+all = [ "default", "rpi", "devices" ]
 rpi = [ "dep:ioc_rpi_gpio" ]
 devices = [ "dep:ioc_devices" ]
 server = [ "dep:ioc_server" ]
