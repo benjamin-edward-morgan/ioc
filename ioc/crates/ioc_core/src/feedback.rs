@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{error::IocBuildError, Input, InputKind, Module, ModuleIO, Output, OutputKind, Value};
 use serde::Deserialize;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 /// Configuration for a FeedbackItem. Contains a start value.
@@ -46,15 +47,20 @@ impl From<Feedback> for ModuleIO {
 }
 
 ///Spawns a feedback pipe with the given start value. Returns the Input, Output, and JoinHandle.
-fn spawn_feedback_pipe<T: Send + Sync + 'static>(start: T) -> (Input<T>, Output<T>, JoinHandle<()>) {
+fn spawn_feedback_pipe<T: Send + Sync + 'static>(start: T, cancel_token: CancellationToken) -> (Input<T>, Output<T>, JoinHandle<()>) {
     let (input, tx) = Input::new(start);
     let (output, mut rx) = Output::new();
     let handle = tokio::spawn(async move {
-        while let Some(new_value) = rx.recv().await {
-            if let Err(err) = tx.send(new_value) {
-                warn!("Error sending to Input from feedback pipe: {}", err);
-                break;
-            }
+        tokio::select!{
+            _ = cancel_token.cancelled() => {}
+            _ = tokio::spawn(async move {
+                while let Some(new_value) = rx.recv().await {
+                    if let Err(err) = tx.send(new_value) {
+                        warn!("Error sending to Input from feedback pipe: {}", err);
+                        break;
+                    }
+                }
+            }) => {}
         }
         debug!("feedback pipe shut down!")
     });
@@ -74,7 +80,7 @@ impl Module for Feedback {
     /// # Returns
     ///
     /// Returns a `Result` containing the built `Feedback` instance if successful, or an `IocBuildError` if an error occurs.
-    async fn try_build(cfg: &Self::Config) -> Result<Self, IocBuildError> {
+    async fn try_build(cfg: &Self::Config, cancel_token: CancellationToken) -> Result<Self, IocBuildError> {
         let mut inputs = HashMap::with_capacity(cfg.items.len());
         let mut outputs = HashMap::with_capacity(cfg.items.len());
         let mut join_handles = Vec::with_capacity(cfg.items.len());
@@ -82,37 +88,37 @@ impl Module for Feedback {
         for (name, item_cfg) in &cfg.items {
             match item_cfg {
                 FeedbackItemConfig::String{ start} => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone());
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::String(input));
                     outputs.insert(name.clone(), OutputKind::String(output));
                     join_handles.push(join_handle);
                 },
                 FeedbackItemConfig::Binary { start } => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone());
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::Binary(input));
                     outputs.insert(name.clone(), OutputKind::Binary(output));
                     join_handles.push(join_handle);
                 },
                 FeedbackItemConfig::Float{ start } => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(*start);
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::Float(input));
                     outputs.insert(name.clone(), OutputKind::Float(output));
                     join_handles.push(join_handle);
                 },
                 FeedbackItemConfig::Bool{ start } => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(*start);
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::Bool(input));
                     outputs.insert(name.clone(), OutputKind::Bool(output));
                     join_handles.push(join_handle);
                 },
                 FeedbackItemConfig::Array { start } => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone());
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::Array(input));
                     outputs.insert(name.clone(), OutputKind::Array(output));
                     join_handles.push(join_handle);
                 },
                 FeedbackItemConfig::Object { start } => {
-                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone());
+                    let (input, output, join_handle) = spawn_feedback_pipe(start.clone(), cancel_token.clone());
                     inputs.insert(name.clone(), InputKind::Object(input));
                     outputs.insert(name.clone(), OutputKind::Object(output));
                     join_handles.push(join_handle);

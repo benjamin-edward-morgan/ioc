@@ -24,6 +24,7 @@ use ioc_core::ModuleBuilder;
 //rpi (for i2c source)
 #[cfg(feature = "rpi")]
 use ioc_rpi_gpio::{I2c, gpio::{Gpio, GpioConfig}};
+use tokio_util::sync::CancellationToken;
 
 #[cfg(feature = "rpi")]
 fn i2c_bus_provider(bus: u8) -> I2c {
@@ -60,22 +61,22 @@ pub enum IocModuleConfig {
 }
 
 impl IocModuleConfig {
-    pub async fn build(&self) -> Result<ModuleIO, IocBuildError> {
+    pub async fn build(&self, cancel_token: CancellationToken) -> Result<ModuleIO, IocBuildError> {
         match self {
             //core
-            Self::Feedback(feedback_config) => Feedback::try_build(feedback_config)
+            Self::Feedback(feedback_config) => Feedback::try_build(feedback_config, cancel_token)
             .await
             .map(|feedback| feedback.into()),
 
             //server
             #[cfg(feature = "server")]
-            Self::Server(server_config) => Server::try_build(server_config)
+            Self::Server(server_config) => Server::try_build(server_config, cancel_token)
                 .await
                 .map(|server| server.into()),
 
             //extra
             #[cfg(feature = "extra")]
-            Self::RaspiCam(cam_config) => Camera::try_build(cam_config).await.map(|cam| cam.into()),
+            Self::RaspiCam(cam_config) => Camera::try_build(cam_config, cancel_token).await.map(|cam| cam.into()),
 
             //devices
             #[cfg(feature = "devices")]
@@ -101,7 +102,7 @@ impl IocModuleConfig {
             
             //rpi
             #[cfg(feature = "rpi")]
-            Self::Gpio(gpio_config) => Gpio::try_build(gpio_config).await.map(|gpio| gpio.into()),
+            Self::Gpio(gpio_config) => Gpio::try_build(gpio_config, cancel_token).await.map(|gpio| gpio.into()),
         }
     }
 }

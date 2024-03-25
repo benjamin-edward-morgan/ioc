@@ -1,6 +1,7 @@
 use crate::{ServerInputConfig, ServerOutputConfig};
 use ioc_core::error::IocBuildError;
 use ioc_core::Value;
+use tokio_util::sync::CancellationToken;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -115,6 +116,7 @@ impl ServerState {
         channel_size: usize,
         inputs: &HashMap<String, ServerInputConfig>,
         outputs: &HashMap<String, ServerOutputConfig>,
+        cancel_token: CancellationToken,
     ) -> Result<Self, IocBuildError> {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(channel_size);
 
@@ -138,7 +140,7 @@ impl ServerState {
 
         let mut state_subs = StateSubscriptions::with_capacities(100, 100);
 
-        let handle = tokio::spawn(async move {
+        let server_state_handle = tokio::spawn(async move {
             while let Some(cmd) = cmd_rx.recv().await {
                 match cmd {
                     StateCmd::Subscribe {
@@ -420,6 +422,12 @@ impl ServerState {
                 }
             }
             debug!("ServerState is done!");
+        });
+
+        let handle = tokio::spawn(async move {
+            cancel_token.cancelled().await;
+            debug!("shutting down ServerState task!");
+            server_state_handle.abort();
         });
 
         Ok(ServerState { handle, cmd_tx })

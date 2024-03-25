@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use module::IocModuleConfig;
 use pipe::PipeConfig;
+use tokio_util::sync::CancellationToken;
 use transformer::IocTransformerConfig;
 
 use futures_util::future::join_all;
@@ -32,7 +33,7 @@ pub struct IocConfig {
 impl IocConfig {
     ///Builds and runs the application, waiting for it to finish.
     /// Returns an error if the application can't be started.
-    pub async fn start(self) -> Result<(), IocBuildError> {
+    pub async fn start(self, cancel_token: CancellationToken) -> Result<(), IocBuildError> {
         let mut handles = Vec::with_capacity(128);
         let mut inputs = HashMap::with_capacity(128);
         let mut outputs = HashMap::with_capacity(128);
@@ -41,7 +42,7 @@ impl IocConfig {
         debug!("building modules ...");
         for (module_key, module_config) in self.modules {
             trace!("building module {} ...", module_key);
-            match module_config.build().await {
+            match module_config.build(cancel_token.clone()).await {
                 Ok(module) => {
                     handles.push(module.join_handle);
                     //inputs and outputs are created, prefixed with the module's key
@@ -132,7 +133,7 @@ impl IocConfig {
         debug!("done building transformers. building pipes ...");
         for pipe_config in self.pipes {
             trace!("building pipe {:?}", pipe_config);
-            let pipe = pipe_config.try_build(&inputs, &outputs)?;
+            let pipe = pipe_config.try_build(&inputs, &outputs, cancel_token.clone())?;
             handles.push(pipe.handle);
         }
         debug!("done bulding pipes. done starting up.");

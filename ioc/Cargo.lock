@@ -666,6 +666,7 @@ dependencies = [
  "rand",
  "serde",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]
@@ -676,6 +677,7 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -740,6 +742,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tower",
  "tower-http",
  "tracing",
