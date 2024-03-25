@@ -7,6 +7,7 @@ use tokio::{
     sync::{mpsc, watch},
     task::JoinHandle,
 };
+use tokio_util::sync::CancellationToken;
 
 pub mod error;
 pub mod pipe;
@@ -203,7 +204,7 @@ pub struct ModuleIO {
 pub trait Module: Into<ModuleIO> {
     type Config;
 
-    fn try_build(cfg: &Self::Config) -> impl Future<Output = Result<Self, IocBuildError>>;
+    fn try_build(cfg: &Self::Config, cancel_token: CancellationToken) -> impl Future<Output = Result<Self, IocBuildError>>;
 }
 
 ///Similar to a `Module`, this is an entity to construct a `Module`. This is useful when there is some

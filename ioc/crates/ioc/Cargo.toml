@@ -27,5 +27,6 @@ config_rs = { version = "0.14.0", package="config", features = ["yaml"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 serde.workspace = true
 futures-util.workspace = true

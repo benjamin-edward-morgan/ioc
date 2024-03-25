@@ -2,6 +2,8 @@ pub mod config;
 
 use config::IocConfig;
 use config_rs::{Config, File};
+use tokio::signal::unix::{signal, SignalKind};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,8 +43,10 @@ async fn main() {
                     info!("description: {descrip}")
                 }
 
+                let cancel_token = get_cancellation_token();
+
                 //this starts the application and waits for it to finish
-                match config.start().await {
+                match config.start(cancel_token).await {
                     Ok(_) => info!("IOC shut down!"),
                     Err(err) => error!("IOC exited with an error: {:?}", err),
                 }
@@ -55,4 +59,18 @@ async fn main() {
             }
         }
     }
+}
+
+
+fn get_cancellation_token() -> CancellationToken {
+    let token = CancellationToken::new();
+    let task_token = token.clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl-c");
+        info!("ctrl-c received, shutting down");
+        task_token.cancel();
+    });
+    token
 }

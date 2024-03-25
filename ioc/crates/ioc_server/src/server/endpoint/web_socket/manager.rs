@@ -53,7 +53,7 @@ impl WebSocketManager {
                         WebSocketConnection::new(&task_state_cmd_tx, websocket, subscription).await;
                 }
             }
-            info!("websocket manager is done!");
+            debug!("websocket manager is done!");
         });
 
         Self { websocket_tx }

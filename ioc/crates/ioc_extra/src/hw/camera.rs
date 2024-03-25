@@ -8,6 +8,7 @@ use ioc_core::{
 };
 use jpeg_stream_splitter::split_jpegs;
 use serde::Deserialize;
+use tokio_util::sync::CancellationToken;
 use std::collections::HashMap;
 use tokio::{
     sync::broadcast,
@@ -71,7 +72,7 @@ pub struct CameraConfig {}
 impl Module for Camera {
     type Config = CameraConfig;
 
-    async fn try_build(_cfg: &CameraConfig) -> Result<Self, IocBuildError> {
+    async fn try_build(_cfg: &CameraConfig, cancel_token: CancellationToken) -> Result<Self, IocBuildError> {
 
 
         let (mjpeg, frame_tx) = Input::new(Vec::new());

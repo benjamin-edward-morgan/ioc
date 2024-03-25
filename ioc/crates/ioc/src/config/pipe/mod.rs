@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ioc_core::{error::IocBuildError, pipe::Pipe, InputKind, OutputKind};
 use serde::Deserialize;
+use tokio_util::sync::CancellationToken;
 
 //A `Pipe`` is a simple object that reads values from an `Input` and writes values received to an `Output`
 #[derive(Deserialize, Debug)]
@@ -18,21 +19,24 @@ impl PipeConfig {
         &self,
         inputs: &HashMap<String, InputKind>,
         outputs: &HashMap<String, OutputKind>,
+        cancel_token: CancellationToken,
     ) -> Result<Pipe, IocBuildError> {
         let input = inputs.get(&self.from);
         let output = outputs.get(&self.to);
 
         match (input, output) {
             // If both input and output are of type String, create a new Pipe with the input and output as references.
-            (Some(InputKind::String(input)), Some(OutputKind::String(output))) => Ok(Pipe::new(input, output)),
+            (Some(InputKind::String(input)), Some(OutputKind::String(output))) => Ok(Pipe::new(input, output, cancel_token)),
             // If both input and output are of type Binary, create a new Pipe with the input and output as references.
-            (Some(InputKind::Binary(input)), Some(OutputKind::Binary(output))) => Ok(Pipe::new(input, output)),
+            (Some(InputKind::Binary(input)), Some(OutputKind::Binary(output))) => Ok(Pipe::new(input, output, cancel_token)),
             // If both input and output are of type Float, create a new Pipe with the input and output as references.
-            (Some(InputKind::Float(input)), Some(OutputKind::Float(output))) => Ok(Pipe::new(input, output)),
+            (Some(InputKind::Float(input)), Some(OutputKind::Float(output))) => Ok(Pipe::new(input, output, cancel_token)),
             // If both input and output are of type Bool, create a new Pipe with the input and output as references.
-            (Some(InputKind::Bool(input)), Some(OutputKind::Bool(output))) => Ok(Pipe::new(input, output)),
+            (Some(InputKind::Bool(input)), Some(OutputKind::Bool(output))) => Ok(Pipe::new(input, output, cancel_token)),
             // If both input and output are of type Array, create a new Pipe with the input and output as references.
-            (Some(InputKind::Array(input)), Some(OutputKind::Array(output))) => Ok(Pipe::new(input, output)),
+            (Some(InputKind::Array(input)), Some(OutputKind::Array(output))) => Ok(Pipe::new(input, output, cancel_token)),
+            // If both input and output are of type Object, create a new Pipe with the input and output as references.
+            (Some(InputKind::Object(input)), Some(OutputKind::Object(output))) => Ok(Pipe::new(input, output, cancel_token)),
             // If the input and output types do not match, return an error with the mismatched types.
             (Some(input), Some(output)) => {
                 Err(

@@ -10,6 +10,7 @@ use ioc_core::OutputKind;
 use ioc_core::Value;
 use tokio::join;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use std::net::SocketAddr;
@@ -105,7 +106,7 @@ impl From<Server> for ModuleIO {
 impl Module for Server {
     type Config = ServerConfig;
 
-    async fn try_build(cfg: &ServerConfig) -> Result<Self, IocBuildError> {
+    async fn try_build(cfg: &ServerConfig, cancel_token: CancellationToken) -> Result<Self, IocBuildError> {
         debug!("building server state ...");
 
         //global state
@@ -113,6 +114,7 @@ impl Module for Server {
             cfg.state_channel_size.unwrap_or(16),
             &cfg.inputs,
             &cfg.outputs,
+            cancel_token.clone(),
         )?;
         let cmd_tx = state.cmd_tx;
 
@@ -156,6 +158,7 @@ impl Module for Server {
         let server_handle = tokio::spawn(async move {
             axum::Server::bind(&socket_addr)
                 .serve(router_service.into_make_service())
+                .with_graceful_shutdown(cancel_token.cancelled())
                 .await
                 .unwrap();
         });
