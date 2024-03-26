@@ -1,0 +1,26 @@
+metadata:
+  name: camera demo
+  description: to test only the camera interface
+
+# modules expose inputs and outputs from various sources
+modules:
+  local_server: 
+    Server:
+      port: 8080
+      root_context: /
+      inputs: {}
+      outputs:
+        jpeg_frames: Binary
+      endpoints: 
+        "/stream":
+          Mjpeg:
+            output: jpeg_frames
+ 
+  camera:
+    RaspiCam: {}
+
+transformers: {}
+
+# pipes read from inputs and write to outputs
+pipes:
+  - { from: camera.mjpeg, to: local_server.jpeg_frames }

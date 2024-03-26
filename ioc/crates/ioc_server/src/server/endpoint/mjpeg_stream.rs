@@ -54,19 +54,30 @@ static BOUNDARY: &str = "lolthisismyboundlol";
 fn as_mjpeg_stream(
     frames: watch::Receiver<Vec<u8>>,
 ) -> impl Stream<Item = Result<Vec<u8>, String>> {
-    WatchStream::new(frames).map(|mut frame| {
-        let mut bound = format!(
+    let remaining = WatchStream::new(frames).map(|mut frame| {
+        let mut bound0 = format!(
             "--{}\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
             BOUNDARY,
             frame.len()
         )
         .into_bytes();
-        let mut bytes = Vec::with_capacity(frame.len() + bound.len());
+        let mut bound1 = format!(
+            "--{}\r\n",
+            BOUNDARY,
+        ).into_bytes();
 
-        bytes.append(&mut bound);
+        let mut bytes = Vec::with_capacity(frame.len() + bound0.len() + bound1.len());
+
+        bytes.append(&mut bound0);
         bytes.append(&mut frame);
+        bytes.append(&mut bound1);
         Ok(bytes)
-    })
+    });
+
+    let start = format!("--{}\r\n", BOUNDARY).into_bytes();
+    let start = tokio_stream::once(Ok(start));
+
+    start.chain(remaining)
 }
 
 impl MjpegStreamEndpoint {
