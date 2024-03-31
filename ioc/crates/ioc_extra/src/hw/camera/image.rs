@@ -9,6 +9,7 @@ pub struct TestPatternGenerator {
     w: u16,
     h: u16,
     q: u8,
+    message: Option<String>
 }
 
 impl TestPatternGenerator {

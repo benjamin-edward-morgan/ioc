@@ -4,45 +4,56 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
 #[derive(Debug)]
-pub struct ChildProcessError {
-    _message: String,
+pub struct ChildProcessError<X: 'static> {
+    pub message: String,
+    pub x: X,
 }
 
-impl ChildProcessError {
-    pub fn new(message: &str) -> Self {
+impl <X: 'static> ChildProcessError<X> {
+    pub fn new(message: String, x: X) -> Self {
         Self {
-            _message: message.to_string(),
+            message,
+            x,
         }
     }
 }
 
-impl From<std::io::Error> for ChildProcessError {
-    fn from(value: std::io::Error) -> Self {
-        Self {
-            _message: format!("{:?}", value),
-        }
-    }
-}
 
-pub fn start_child_process<O>(
+pub fn start_child_process<X: 'static, O: 'static>(
     cmd: &str,
     args: &[&str],
-    stream_handler: fn(ChildStdout) -> O,
+    x: X,
+    stream_handler: impl Fn(ChildStdout, X) -> O,
     cancel_token: CancellationToken,
-) -> Result<O, ChildProcessError> {
-    debug!("spawing child process ... [{} {}]", cmd, args.join(" "));
-    let mut child = Command::new(cmd)
+) -> Result<O, ChildProcessError<X>> {
+    debug!("spawning child process ... [{} {}]", cmd, args.join(" "));
+    let mut child = match Command::new(cmd)
         .args(args)
         .stderr(Stdio::inherit())
         .stdout(Stdio::piped())
-        .spawn()?;
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(err) => {
+            return Err(ChildProcessError::new(
+                format!("error starting child process: {:?}", err),
+                x,
+            ));
+        }
+    };
 
-    let child_out = child.stdout.take().ok_or(ChildProcessError::new(
-        "Unable to open stdout stream from child priocess",
-    ))?;
+    let child_out = match child.stdout.take() {
+        Some(child_out) => child_out,
+        None => {
+            return Err(ChildProcessError::new(
+                "Unable to open stdout stream from child priocess".to_owned(),
+                x,
+            ));
+        }
+    };
 
     debug!("creating stream handler for child process ...");
-    let output = stream_handler(child_out);
+    let output = stream_handler(child_out, x);
 
     debug!("waiting for child process to exit ...");
     tokio::spawn(async move {

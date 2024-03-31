@@ -55,23 +55,28 @@ fn as_mjpeg_stream(
     frames: watch::Receiver<Vec<u8>>,
 ) -> impl Stream<Item = Result<Vec<u8>, String>> {
     let remaining = WatchStream::new(frames).map(|mut frame| {
-        let mut bound0 = format!(
-            "--{}\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
-            BOUNDARY,
-            frame.len()
-        )
-        .into_bytes();
-        let mut bound1 = format!(
-            "--{}\r\n",
-            BOUNDARY,
-        ).into_bytes();
+        if !frame.is_empty() {
+            debug!("emit nonempty frame! {}", frame.len());
+            let mut bound0 = format!(
+                "Content-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                frame.len()
+            )
+            .into_bytes();
+            let mut bound1 = format!(
+                "\r\n--{}\r\n",
+                BOUNDARY,
+            ).into_bytes();
 
-        let mut bytes = Vec::with_capacity(frame.len() + bound0.len() + bound1.len());
+            let mut bytes = Vec::with_capacity(frame.len() + bound0.len() + bound1.len());
 
-        bytes.append(&mut bound0);
-        bytes.append(&mut frame);
-        bytes.append(&mut bound1);
-        Ok(bytes)
+            bytes.append(&mut bound0);
+            bytes.append(&mut frame);
+            bytes.append(&mut bound1);
+            Ok(bytes)
+        } else {
+            debug!("emit empty frame!");
+            Ok(vec![])
+        }
     });
 
     let start = format!("--{}\r\n", BOUNDARY).into_bytes();
