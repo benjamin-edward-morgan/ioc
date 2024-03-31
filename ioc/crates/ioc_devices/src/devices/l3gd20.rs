@@ -235,7 +235,7 @@ where
 
         let ctrl1 = ctrl1_register_value(&dr, 0, false);
         match i2c.write(i2c_address, &[CTRL1_REGISTER, ctrl1]) {
-            Ok(_) => debug!("successfullt disabled gyro on shutdown"),
+            Ok(_) => debug!("successfully disabled gyro on shutdown"),
             Err(err) => warn!("error disabling gyro on shutdown! {:?}", err),
         }
 

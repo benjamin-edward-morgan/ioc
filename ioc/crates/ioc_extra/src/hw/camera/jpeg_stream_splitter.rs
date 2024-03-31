@@ -1,7 +1,9 @@
+
 use crate::hw::camera::image::JpegImage;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::sync::broadcast;
-use tracing::debug;
+use tokio::sync::{broadcast, watch};
+use tokio::task::JoinHandle;
+use tracing::{debug, warn};
 
 enum SplitJpegState {
     Marker1,      //looking for 0xFF
@@ -15,8 +17,9 @@ enum SplitJpegState {
 
 pub fn split_jpegs(
     mut byte_stream: impl AsyncRead + AsyncReadExt + Send + Unpin + 'static,
-) -> broadcast::Receiver<Option<JpegImage>> {
-    let (tx, rx) = broadcast::channel(1);
+    mut frame_tx: watch::Sender<Vec<u8>>,
+) -> JoinHandle<watch::Sender<Vec<u8>>> {
+    // let (tx, rx) = broadcast::channel(1);
 
     let buffer_size: usize = 1024;
     let mut buf: Vec<u8> = vec![0; buffer_size];
@@ -52,10 +55,10 @@ pub fn split_jpegs(
                                 state = SplitJpegState::Marker1;
                                 frame.push(b);
 
-                                tx.send(Some(JpegImage {
-                                    bytes: frame.clone(),
-                                }))
-                                .unwrap();
+                                if let Err(err) = frame_tx.send(frame.clone()) {
+                                    warn!("error sending jpeg frame from jpeg_stream_splitter: {:?}", err);
+                                    break;
+                                }
                                 frame.clear();
                             } else if (0xD0..0xD7).contains(&b) {
                                 //reset marker - no size
@@ -118,11 +121,13 @@ pub fn split_jpegs(
                     }
                 }
             } else {
+                //0 bytes read indicates end of stream
                 break;
             }
         }
-        debug!("child process stream ended.")
-    });
+        debug!("child process stream ended.");
 
-    rx
+        //return frame sender 
+        frame_tx
+    })
 }

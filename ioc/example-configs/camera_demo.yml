@@ -8,10 +8,16 @@ modules:
     Server:
       port: 8080
       root_context: /
-      inputs: {}
+      inputs: 
+        enable_camera: 
+          Bool: { start: false }
       outputs:
         jpeg_frames: Binary
       endpoints: 
+        "/ws":
+          WebSocket: 
+            inputs: [ enable_camera ]
+            outputs: [ ]
         "/stream":
           Mjpeg:
             output: jpeg_frames
@@ -24,3 +30,4 @@ transformers: {}
 # pipes read from inputs and write to outputs
 pipes:
   - { from: camera.mjpeg, to: local_server.jpeg_frames }
+  - { from: local_server.enable_camera, to: camera.enable }
