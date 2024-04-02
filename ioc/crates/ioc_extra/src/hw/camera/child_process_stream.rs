@@ -18,7 +18,6 @@ impl <X: 'static> ChildProcessError<X> {
     }
 }
 
-
 pub fn start_child_process<X: 'static, O: 'static>(
     cmd: &str,
     args: &[&str],

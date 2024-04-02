@@ -1,7 +1,6 @@
 
-use crate::hw::camera::image::JpegImage;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::sync::{broadcast, watch};
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
@@ -17,9 +16,8 @@ enum SplitJpegState {
 
 pub fn split_jpegs(
     mut byte_stream: impl AsyncRead + AsyncReadExt + Send + Unpin + 'static,
-    mut frame_tx: watch::Sender<Vec<u8>>,
+    frame_tx: watch::Sender<Vec<u8>>,
 ) -> JoinHandle<watch::Sender<Vec<u8>>> {
-    // let (tx, rx) = broadcast::channel(1);
 
     let buffer_size: usize = 1024;
     let mut buf: Vec<u8> = vec![0; buffer_size];

@@ -56,7 +56,6 @@ fn as_mjpeg_stream(
 ) -> impl Stream<Item = Result<Vec<u8>, String>> {
     let remaining = WatchStream::new(frames).map(|mut frame| {
         if !frame.is_empty() {
-            debug!("emit nonempty frame! {}", frame.len());
             let mut bound0 = format!(
                 "Content-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
                 frame.len()
@@ -74,7 +73,6 @@ fn as_mjpeg_stream(
             bytes.append(&mut bound1);
             Ok(bytes)
         } else {
-            debug!("emit empty frame!");
             Ok(vec![])
         }
     });
