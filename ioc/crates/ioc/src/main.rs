@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-///application enrty point
+///application entry point
 #[tokio::main]
 async fn main() {
     //set up logging 

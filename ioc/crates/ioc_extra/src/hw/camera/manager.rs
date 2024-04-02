@@ -1,9 +1,9 @@
-use futures::{stream, FutureExt, TryFutureExt};
-use tokio::{process::ChildStdout, sync::{mpsc, oneshot, watch}, task::JoinHandle};
+use embedded_graphics::{framebuffer::buffer_size, pixelcolor::Rgb888};
+use tokio::{process::ChildStdout, sync::{mpsc, watch}, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
-use super::{child_process_stream::start_child_process, image::TestPatternGenerator, jpeg_stream_splitter::split_jpegs};
+use super::{child_process_stream::start_child_process, image::TestFrameGenerator, jpeg_stream_splitter::split_jpegs};
 
 
 struct CameraMjpegStream {
@@ -13,7 +13,7 @@ struct CameraMjpegStream {
 impl CameraMjpegStream {
     fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>, params: CameraParams) -> Self {
 
-        frames.send(TestPatternGenerator::new(640, 480, 0).generate().bytes).unwrap();
+        frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("starting camera stream...").build_jpeg()).unwrap();
 
         let args = params.get_libcamera_params();
         let stream_handler = |child_out: ChildStdout, frames_tx: watch::Sender<Vec<u8>>| split_jpegs(child_out, frames_tx);
@@ -23,8 +23,10 @@ impl CameraMjpegStream {
             Ok(handle) => handle,
             Err(err) => {
                 error!("error starting child process: {:?}", err.message);
+                let frames = err.x;
+                frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("camera error!").build_jpeg()).unwrap();
                 tokio::spawn(async move {
-                    err.x
+                    frames
                 })
             },
         };
@@ -57,7 +59,7 @@ struct CameraDisabled {
 
 impl CameraDisabled {
     fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>) -> Self {
-        frames.send(TestPatternGenerator::new(640, 480, 90).generate().bytes).unwrap();
+        frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("camera disabled").build_jpeg()).unwrap();
         Self{ frames: Some(frames), camevt_tx }
     }
 

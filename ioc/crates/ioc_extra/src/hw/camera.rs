@@ -3,21 +3,14 @@ mod image;
 mod manager;
 mod jpeg_stream_splitter;
 
-use child_process_stream::start_child_process;
 use ioc_core::{
     error::IocBuildError, Input, InputKind, Module, ModuleIO, Output, OutputKind
 };
-use jpeg_stream_splitter::split_jpegs;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 use std::collections::HashMap;
-use tokio::{
-    sync::broadcast,
-    task::JoinHandle,
-};
+use tokio::task::JoinHandle;
 use manager::CameraManager;
-
-use self::{child_process_stream::ChildProcessError, image::JpegImage};
 
 
 // fn start_mjpeg_stream(cancel_token: CancellationToken) -> Result<broadcast::Receiver<Option<JpegImage>>, ChildProcessError> {
