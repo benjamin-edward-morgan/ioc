@@ -29,6 +29,8 @@ modules:
           Bool: { start: false }
         mjpeg_quality:
           Float: { start: 50, min: 0, max: 100, step: 1 }
+        camera_framerate:
+          Float: { start: 5, min: 1, max: 60, step: 1 }
       outputs:
         gyroscope: Array
         magnetometer: Array
@@ -52,7 +54,7 @@ modules:
             directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera, mjpeg_quality ]
+            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera, mjpeg_quality, camera_framerate ]
             outputs: [ accelerometer, magnetometer, gyroscope, temperature, pressure ]
         "/debug":
           WebSocket:
@@ -113,3 +115,4 @@ pipes:
   - { from: camera.mjpeg, to: local_server.jpeg_frames }
   - { from: local_server.enable_camera, to: camera.enable }
   - { from: local_server.mjpeg_quality, to: camera.quality }
+  - { from: local_server.camera_framerate, to: camera.framerate }

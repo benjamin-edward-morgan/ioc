@@ -18,6 +18,7 @@ pub struct Camera {
     pub mjpeg: Input<Vec<u8>>,
     pub enable: Output<bool>,
     pub q: Output<f64>,
+    pub framerate: Output<f64>,
 }
 
 impl From<Camera> for ModuleIO {
@@ -26,7 +27,8 @@ impl From<Camera> for ModuleIO {
             join_handle: cam.join_handle,
             outputs: HashMap::from([
                 ("enable".to_owned(), OutputKind::Bool(cam.enable)),
-                ("quality".to_owned(), OutputKind::Float(cam.q))
+                ("quality".to_owned(), OutputKind::Float(cam.q)),
+                ("framerate".to_owned(), OutputKind::Float(cam.framerate)),
             ]),
             inputs: HashMap::from([("mjpeg".to_owned(), InputKind::Binary(cam.mjpeg))]),
         }
@@ -45,14 +47,16 @@ impl Module for Camera {
         let (mjpeg, frame_tx) = Input::new(Vec::new());
         let (enable, enable_rx) = Output::new();
         let (q, q_rx) = Output::new();
+        let (framerate, framerate_rx) = Output::new();
 
-        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, q_rx, frame_tx, cancel_token);
+        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, q_rx, framerate_rx, frame_tx, cancel_token);
 
         Ok(Self {
             join_handle,
             mjpeg,
             enable,
             q,
+            framerate,
         })
     }
 }
