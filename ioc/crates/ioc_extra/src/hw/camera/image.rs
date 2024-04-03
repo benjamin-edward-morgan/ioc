@@ -11,23 +11,34 @@ use embedded_graphics::{
     text::{renderer::CharacterStyle, Alignment, Text}
 };
 
+//these boxes are necessary to avoid sending large objects on the stack, causing stack overflow!
 pub enum SimpleFrameBuffer {
-    _320x240(Framebuffer<Rgb888, RawU24, LittleEndian, 320, 240, {buffer_size::<Rgb888>(320, 240)}>),
-    _640x480(Framebuffer<Rgb888, RawU24, LittleEndian, 640, 480, {buffer_size::<Rgb888>(640, 480)}>),
+    _320x240(Box<Framebuffer<Rgb888, RawU24, LittleEndian, 320, 240, {buffer_size::<Rgb888>(320, 240)}>>),
+    _640x480(Box<Framebuffer<Rgb888, RawU24, LittleEndian, 640, 480, {buffer_size::<Rgb888>(640, 480)}>>),
+    _1280x720(Box<Framebuffer<Rgb888, RawU24, LittleEndian, 1280, 720, {buffer_size::<Rgb888>(1280, 720)}>>),
+    _1920x1080(Box<Framebuffer<Rgb888, RawU24, LittleEndian, 1920, 1080, {buffer_size::<Rgb888>(1920, 1080)}>>),
 }
 
 impl SimpleFrameBuffer {
     fn new_320x240() -> Self {
-        Self::_320x240(Framebuffer::new())
+        Self::_320x240(Box::new(Framebuffer::new()))
     }
     fn new_640x480() -> Self {
-        Self::_640x480(Framebuffer::new())
+        Self::_640x480(Box::new(Framebuffer::new()))
+    }
+    fn new_1280x720() -> Self {
+        Self::_1280x720(Box::new(Framebuffer::new()))
+    }
+    fn new_1920x1080() -> Self {
+        Self::_1920x1080(Box::new(Framebuffer::new()))
     }
 
     fn data(&self) -> &[u8] {
         match self {
             Self::_320x240(fb) => fb.data(),
             Self::_640x480(fb) => fb.data(),
+            Self::_1280x720(fb) => fb.data(),
+            Self::_1920x1080(fb) => fb.data(),
         }
     }
 }
@@ -37,6 +48,8 @@ impl OriginDimensions for SimpleFrameBuffer {
         match self {
             Self::_320x240(fb) => fb.size(),
             Self::_640x480(fb) => fb.size(),
+            Self::_1280x720(fb) => fb.size(),
+            Self::_1920x1080(fb) => fb.size(),
         }
     }
 }
@@ -51,6 +64,8 @@ impl DrawTarget for SimpleFrameBuffer {
         match self {
             Self::_320x240(fb) => fb.draw_iter(pixels),
             Self::_640x480(fb) => fb.draw_iter(pixels),
+            Self::_1280x720(fb) => fb.draw_iter(pixels),
+            Self::_1920x1080(fb) => fb.draw_iter(pixels),
         }
     }
 }
@@ -85,6 +100,8 @@ impl TestFrameGenerator {
         let mut framebuffer = match (self.w, self.h) {
             (320, 240) => SimpleFrameBuffer::new_320x240(),
             (640, 480) => SimpleFrameBuffer::new_640x480(),
+            (1280, 720) => SimpleFrameBuffer::new_1280x720(),
+            (1920, 1080) => SimpleFrameBuffer::new_1920x1080(),
             _ => panic!("unsupported frame size!"),
         };
 

@@ -19,6 +19,7 @@ pub struct Camera {
     pub enable: Output<bool>,
     pub q: Output<f64>,
     pub framerate: Output<f64>,
+    pub resolution: Output<String>,
 }
 
 impl From<Camera> for ModuleIO {
@@ -29,6 +30,7 @@ impl From<Camera> for ModuleIO {
                 ("enable".to_owned(), OutputKind::Bool(cam.enable)),
                 ("quality".to_owned(), OutputKind::Float(cam.q)),
                 ("framerate".to_owned(), OutputKind::Float(cam.framerate)),
+                ("resolution".to_owned(), OutputKind::String(cam.resolution)),
             ]),
             inputs: HashMap::from([("mjpeg".to_owned(), InputKind::Binary(cam.mjpeg))]),
         }
@@ -48,8 +50,9 @@ impl Module for Camera {
         let (enable, enable_rx) = Output::new();
         let (q, q_rx) = Output::new();
         let (framerate, framerate_rx) = Output::new();
+        let (resolution, resolution_rx) = Output::new();
 
-        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, q_rx, framerate_rx, frame_tx, cancel_token);
+        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, q_rx, framerate_rx, resolution_rx, frame_tx, cancel_token);
 
         Ok(Self {
             join_handle,
@@ -57,6 +60,7 @@ impl Module for Camera {
             enable,
             q,
             framerate,
+            resolution,
         })
     }
 }
