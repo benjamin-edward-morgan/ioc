@@ -36,6 +36,7 @@ pub enum WsInputStateInitial {
     String {
         value: String,
         max_length: usize,
+        choices: Option<HashMap<String, String>>,
     },
     Binary {
         value: Vec<u8>,
@@ -64,8 +65,8 @@ impl From<ServerInputState> for WsInputStateInitial {
             },
             ServerInputState::Bool { value } => 
                 WsInputStateInitial::Bool { value },
-            ServerInputState::String { value, max_length } => {
-                WsInputStateInitial::String { value, max_length }
+            ServerInputState::String { value, max_length, choices } => {
+                WsInputStateInitial::String { value, max_length, choices }
             }
             ServerInputState::Binary { value } => 
                 WsInputStateInitial::Binary { value },
@@ -152,6 +153,7 @@ impl From<WsStateUpdate> for ServerInputState {
             WsStateUpdate::String { value } => ServerInputState::String {
                 value,
                 max_length: 0,
+                choices: None,
             },
             WsStateUpdate::Binary { value } => ServerInputState::Binary { value },
             WsStateUpdate::Array { value } => ServerInputState::Array { value },

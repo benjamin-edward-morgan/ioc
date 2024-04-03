@@ -38,6 +38,7 @@ pub enum ServerInputConfig {
     String {
         start: String,
         max_length: usize,
+        choices: Option<HashMap<String,String>>,
     },
     Binary {
         start: Vec<u8>,

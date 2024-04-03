@@ -22,6 +22,7 @@ pub(crate) enum ServerInputState {
     String {
         value: String,
         max_length: usize,
+        choices: Option<HashMap<String, String>>,
     },
     Binary {
         value: Vec<u8>,
@@ -78,10 +79,11 @@ impl From<&ServerInputConfig> for ServerInputState {
                 },
             ServerInputConfig::Bool { start } => 
                 ServerInputState::Bool { value: *start },
-            ServerInputConfig::String { start, max_length } => 
+            ServerInputConfig::String { start, max_length, choices } => 
                 ServerInputState::String {
                     value: start.to_string(),
                     max_length: *max_length,
+                    choices: choices.clone(),
                 },
             ServerInputConfig::Array { start } => 
                 ServerInputState::Array { value: start.clone() },
@@ -239,6 +241,7 @@ impl ServerState {
                                         ServerInputState::String {
                                             value: current_string_value,
                                             max_length,
+                                            choices,
                                         },
                                     ) => {
                                         if *current_string_value != updated_string_value {
@@ -249,6 +252,7 @@ impl ServerState {
                                                 ServerInputState::String {
                                                     value: updated_string_value,
                                                     max_length: *max_length,
+                                                    choices: choices.clone(),
                                                 },
                                             );
                                         }

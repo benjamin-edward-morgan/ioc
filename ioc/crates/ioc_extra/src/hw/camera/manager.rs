@@ -12,7 +12,7 @@ struct CameraMjpegStream {
 impl CameraMjpegStream {
     fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>, params: CameraParams) -> Self {
 
-        frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("starting camera stream...").build_jpeg()).unwrap();
+        frames.send(TestFrameGenerator::new(params.w, params.h).with_q(params.q).with_text("starting camera stream...").build_jpeg()).unwrap();
 
         let args = params.get_libcamera_params();
         let stream_handler = |child_out: ChildStdout, frames_tx: watch::Sender<Vec<u8>>| split_jpegs(child_out, frames_tx);
@@ -23,7 +23,7 @@ impl CameraMjpegStream {
             Err(err) => {
                 error!("error starting child process: {:?}", err.message);
                 let frames = err.x;
-                frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("camera error!").build_jpeg()).unwrap();
+                frames.send(TestFrameGenerator::new(params.w, params.h).with_q(params.q).with_text("camera error!").build_jpeg()).unwrap();
                 tokio::spawn(async move {
                     frames
                 })
@@ -53,7 +53,7 @@ struct CameraDisabled {
 
 impl CameraDisabled {
     fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>, params: CameraParams) -> Self {
-        frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("camera disabled").build_jpeg()).unwrap();
+        frames.send(TestFrameGenerator::new(params.w, params.h).with_q(params.q).with_text("camera disabled").build_jpeg()).unwrap();
         Self{ frames: Some(frames), camevt_tx }
     }
 
@@ -89,6 +89,8 @@ struct CameraParams {
     enabled: bool,
     q: u8, //from 0 to 100 inclusive
     framerate: u8, //from 1 to 60 inclusive
+    w: usize, //resolution width 
+    h: usize, //resolution height
 }
 
 impl CameraParams {
@@ -98,8 +100,6 @@ impl CameraParams {
 
         for arg in [
             "--rotation", "180",
-            "--width", "640",
-            "--height", "480",
             "--codec", "mjpeg",
             "--tuning-file", "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
             "--mode", "3280:2464:10:U", //mode makes sure to use the whole sensor, not cropping middle
@@ -112,6 +112,12 @@ impl CameraParams {
 
         params.push("--framerate".to_string());
         params.push(self.framerate.to_string());
+
+        params.push("--width".to_string());
+        params.push(self.w.to_string());
+
+        params.push("--height".to_string());
+        params.push(self.h.to_string());
 
         for arg in [
                 "-t", "0", //no timeout - stream forever 
@@ -132,6 +138,8 @@ impl Default for CameraParams {
             enabled: false,
             q: 50,
             framerate: 5,
+            w: 640,
+            h: 480,
         }
     }
 }
@@ -141,6 +149,7 @@ fn spawn_watch_camera_params(
     mut enable: mpsc::Receiver<bool>,
     mut q: mpsc::Receiver<f64>,
     mut framerate: mpsc::Receiver<f64>,
+    mut resolution: mpsc::Receiver<String>,
     params_tx: mpsc::Sender<CameraEvt>,
 ) -> JoinHandle<()> {
     let mut params = params.clone();
@@ -177,6 +186,26 @@ fn spawn_watch_camera_params(
                         break;
                     }
                 },
+                resolution_o = resolution.recv() => {
+                    if let Some(resolution_val) = resolution_o {
+                        let parts: Vec<&str> = resolution_val.split('x').collect();
+                        if parts.len() == 2 {
+                            if let (Ok(w), Ok(h)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
+                                params.w = w;
+                                params.h = h;
+                                if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
+                                    break;
+                                }
+                            } else {
+                                error!("invalid resolution string: {}", resolution_val);
+                            }
+                        } else {
+                            error!("invalid resolution string: {}", resolution_val);
+                        }
+                    } else {
+                        break;
+                    }
+                }
             }
         }
         debug!("camera params task shutting down!");
@@ -196,6 +225,7 @@ impl CameraManager {
         enable: mpsc::Receiver<bool>,
         q: mpsc::Receiver<f64>,
         framerate: mpsc::Receiver<f64>,
+        resolution: mpsc::Receiver<String>,
         frames: watch::Sender<Vec<u8>>,
         cancel_token: CancellationToken,
     ) -> JoinHandle<()> {
@@ -204,7 +234,7 @@ impl CameraManager {
             let (camevt_tx, mut camevt_rx) = mpsc::channel::<CameraEvt>(10);
 
             let mut params = CameraParams::default();
-            let params_task = spawn_watch_camera_params(&params, enable, q, framerate, camevt_tx.clone());
+            let params_task = spawn_watch_camera_params(&params, enable, q, framerate, resolution, camevt_tx.clone());
 
             let mut state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
 
