@@ -13,50 +13,21 @@ use tokio::task::JoinHandle;
 use manager::CameraManager;
 
 
-// fn start_mjpeg_stream(cancel_token: CancellationToken) -> Result<broadcast::Receiver<Option<JpegImage>>, ChildProcessError> {
-//     let args = [
-//         "--rotation",
-//         "180",
-//         "--width",
-//         "640",
-//         "--height",
-//         "480",
-//         "--codec",
-//         "mjpeg",
-//         "--framerate",
-//         "10",
-//         "--tuning-file",
-//         "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
-//         "--mode", //mode makes sure to use the whole sensor, not cropping middle
-//         "3280:2464:10:U",
-//         "-q",
-//         "25",
-//         "-t",
-//         "0",
-//         "-n",
-//         "--flush",
-//         "-o",
-//         "-",
-//     ];
-//     start_child_process(
-//         "libcamera-vid",
-//         &args,
-//         split_jpegs,
-//         cancel_token,
-//     )
-// }
-
 pub struct Camera {
     pub join_handle: JoinHandle<()>,
     pub mjpeg: Input<Vec<u8>>,
     pub enable: Output<bool>,
+    pub q: Output<f64>,
 }
 
 impl From<Camera> for ModuleIO {
     fn from(cam: Camera) -> Self {
         ModuleIO {
             join_handle: cam.join_handle,
-            outputs: HashMap::from([("enable".to_owned(), OutputKind::Bool(cam.enable))]),
+            outputs: HashMap::from([
+                ("enable".to_owned(), OutputKind::Bool(cam.enable)),
+                ("quality".to_owned(), OutputKind::Float(cam.q))
+            ]),
             inputs: HashMap::from([("mjpeg".to_owned(), InputKind::Binary(cam.mjpeg))]),
         }
     }
@@ -73,13 +44,15 @@ impl Module for Camera {
 
         let (mjpeg, frame_tx) = Input::new(Vec::new());
         let (enable, enable_rx) = Output::new();
+        let (q, q_rx) = Output::new();
 
-        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, frame_tx, cancel_token);
+        let join_handle = CameraManager::spawn_camera_manager_task(enable_rx, q_rx, frame_tx, cancel_token);
 
         Ok(Self {
             join_handle,
             mjpeg,
             enable,
+            q,
         })
     }
 }

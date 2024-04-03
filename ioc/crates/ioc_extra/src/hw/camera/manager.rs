@@ -1,4 +1,3 @@
-use embedded_graphics::{framebuffer::buffer_size, pixelcolor::Rgb888};
 use tokio::{process::ChildStdout, sync::{mpsc, watch}, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
@@ -13,7 +12,7 @@ struct CameraMjpegStream {
 impl CameraMjpegStream {
     fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>, params: CameraParams) -> Self {
 
-        frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("starting camera stream...").build_jpeg()).unwrap();
+        frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("starting camera stream...").build_jpeg()).unwrap();
 
         let args = params.get_libcamera_params();
         let stream_handler = |child_out: ChildStdout, frames_tx: watch::Sender<Vec<u8>>| split_jpegs(child_out, frames_tx);
@@ -24,7 +23,7 @@ impl CameraMjpegStream {
             Err(err) => {
                 error!("error starting child process: {:?}", err.message);
                 let frames = err.x;
-                frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("camera error!").build_jpeg()).unwrap();
+                frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("camera error!").build_jpeg()).unwrap();
                 tokio::spawn(async move {
                     frames
                 })
@@ -39,14 +38,9 @@ impl CameraMjpegStream {
         Self{ cancel_token }
     }
 
-    async fn transition(&mut self, params: &CameraParams) {
+    async fn transition(&mut self, _params: &CameraParams) {
         debug!("camera mjpeg stream transition");
-        if !params.enabled {
-            debug!("cancelling stream!");
-            self.cancel_token.cancel();
-        } else {
-            debug!("stream already running noop!");
-        }
+        self.cancel_token.cancel();
     }
 }
 
@@ -58,24 +52,18 @@ struct CameraDisabled {
 }
 
 impl CameraDisabled {
-    fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>) -> Self {
-        frames.send(TestFrameGenerator::<640, 480, {buffer_size::<Rgb888>(640, 480)}>::new().with_text("camera disabled").build_jpeg()).unwrap();
+    fn new(frames: watch::Sender<Vec<u8>>, camevt_tx: mpsc::Sender<CameraEvt>, params: CameraParams) -> Self {
+        frames.send(TestFrameGenerator::new(640, 480).with_q(params.q).with_text("camera disabled").build_jpeg()).unwrap();
         Self{ frames: Some(frames), camevt_tx }
     }
 
     async fn transition(&mut self, params: &CameraParams) {
         debug!("camera disabled transition {:?} has frames: {}", params, self.frames.is_some());
-        if params.enabled {
-            match self.frames.take() {
-                Some(frames) => {
-                    self.camevt_tx.send(CameraEvt::StreamFinished(frames)).await.unwrap();
-                },
-                None => {
-                    debug!("no frames to send!");
-                }
-            }
-        } else {
-            debug!("disabled noop!");
+        match self.frames.take() {
+            Some(frames) => {
+                self.camevt_tx.send(CameraEvt::StreamFinished(frames)).await.unwrap();
+            },
+            None => {}
         }
     }
 }
@@ -99,11 +87,15 @@ impl CameraState {
 #[derive(Debug, Clone)]
 struct CameraParams {
     enabled: bool,
+    q: u8, //from 0 to 100 inclusive
 }
 
 impl CameraParams {
-    fn get_libcamera_params(&self) -> Vec<&str> {
-        let params: Vec<&str> = vec![
+    fn get_libcamera_params(&self) -> Vec<String> {
+
+        let mut params: Vec<String> = Vec::with_capacity(50);
+
+        for arg in [
             "--rotation", "180",
             "--width", "640",
             "--height", "480",
@@ -111,21 +103,31 @@ impl CameraParams {
             "--framerate", "10",
             "--tuning-file", "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
             "--mode", "3280:2464:10:U", //mode makes sure to use the whole sensor, not cropping middle
-            "-q", "25", //jpeg quality 
-            "-t", "0", //no timeout - stream forever 
-            "-n", //no preview window 
-            "--flush", //flush output after each frame
-            "-o", "-", //output to stdout
-        ]; 
+        ] {
+            params.push(arg.to_string());
+        }
+
+        params.push("-q".to_string());
+        params.push(self.q.to_string());
+
+        for arg in [
+                "-t", "0", //no timeout - stream forever 
+                "-n", //no preview window 
+                "--flush", //flush output after each frame
+                "-o", "-" //output to std out
+        ] {
+            params.push(arg.to_string());
+        }
+      
         params
     }
-    
 }
 
 impl Default for CameraParams {
     fn default() -> Self {
         CameraParams {
             enabled: false,
+            q: 50,
         }
     }
 }
@@ -133,21 +135,38 @@ impl Default for CameraParams {
 fn spawn_watch_camera_params(
     params: &CameraParams,
     mut enable: mpsc::Receiver<bool>,
+    mut q: mpsc::Receiver<f64>,
     params_tx: mpsc::Sender<CameraEvt>,
 ) -> JoinHandle<()> {
     let mut params = params.clone();
     tokio::spawn(async move {
-        while let Some(enabled) = enable.recv().await {
-            params.enabled = enabled;
-            if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
-                break;
+        loop {
+            tokio::select!{
+                enable_o = enable.recv() => {
+                    if let Some(enabled) = enable_o {
+                        params.enabled = enabled;
+                        if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                },
+                q_o = q.recv() => {
+                    if let Some(q_val) = q_o {
+                        params.q = q_val.max(0.0).min(100.0) as u8;
+                        if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                },
             }
         }
         debug!("camera params task shutting down!");
     })
 }
-
-
 
 enum CameraEvt {
     ParamsUpdated(CameraParams),
@@ -156,11 +175,11 @@ enum CameraEvt {
 
 pub(super) struct CameraManager {}
 
-
 impl CameraManager {
 
     pub(super) fn spawn_camera_manager_task(
         enable: mpsc::Receiver<bool>,
+        q: mpsc::Receiver<f64>,
         frames: watch::Sender<Vec<u8>>,
         cancel_token: CancellationToken,
     ) -> JoinHandle<()> {
@@ -169,12 +188,11 @@ impl CameraManager {
             let (camevt_tx, mut camevt_rx) = mpsc::channel::<CameraEvt>(10);
 
             let mut params = CameraParams::default();
-            let params_task = spawn_watch_camera_params(&params, enable, camevt_tx.clone());
+            let params_task = spawn_watch_camera_params(&params, enable, q, camevt_tx.clone());
 
-            let mut state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone()));
+            let mut state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
 
             loop {
-
                 tokio::select! {
                     _ = cancel_token.cancelled() => {
                         break;
@@ -190,7 +208,7 @@ impl CameraManager {
                                 debug!("stream finished!");
                                 if !params.enabled {
                                     debug!("making stream disabled state");
-                                    state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone()));
+                                    state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
                                 } else {
                                     debug!("making stream mjpeg state");
                                     state = CameraState::MjpegStream(CameraMjpegStream::new(frames, camevt_tx.clone(), params.clone()));

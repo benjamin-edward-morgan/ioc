@@ -20,7 +20,7 @@ impl <X: 'static> ChildProcessError<X> {
 
 pub fn start_child_process<X: 'static, O: 'static>(
     cmd: &str,
-    args: &[&str],
+    args: &[String],
     x: X,
     stream_handler: impl Fn(ChildStdout, X) -> O,
     cancel_token: CancellationToken,

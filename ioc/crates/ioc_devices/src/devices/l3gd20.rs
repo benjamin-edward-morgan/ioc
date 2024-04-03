@@ -5,7 +5,7 @@ use ioc_core::{error::IocBuildError, Input, InputKind, ModuleBuilder, ModuleIO, 
 use serde::Deserialize;
 use tokio::{sync::watch, task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 pub enum DataRate {
     Low0,
