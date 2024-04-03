@@ -11,12 +11,14 @@ modules:
       inputs: 
         enable_camera: 
           Bool: { start: false }
+        mjpeg_quality:
+          Float: { start: 50, min: 0, max: 100, step: 1 }
       outputs:
         jpeg_frames: Binary
       endpoints: 
         "/ws":
           WebSocket: 
-            inputs: [ enable_camera ]
+            inputs: [ enable_camera, mjpeg_quality ]
             outputs: [ ]
         "/stream":
           Mjpeg:
@@ -31,3 +33,4 @@ transformers: {}
 pipes:
   - { from: camera.mjpeg, to: local_server.jpeg_frames }
   - { from: local_server.enable_camera, to: camera.enable }
+  - { from: local_server.mjpeg_quality, to: camera.quality }

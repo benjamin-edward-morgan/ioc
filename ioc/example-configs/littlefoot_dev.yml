@@ -25,13 +25,16 @@ modules:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
         taillights:
           Float: { start: 0.0, min: 0, max: 1, step: 0.1 }
+        enable_camera:
+          Bool: { start: false }
+        mjpeg_quality:
+          Float: { start: 50, min: 0, max: 100, step: 1 }
       outputs:
         gyroscope: Array
         magnetometer: Array
         accelerometer: Array
         temperature: Float 
         pressure: Float 
-
         pan_dev: Float 
         tilt_dev: Float
         drive_fwd_dev: Float
@@ -42,7 +45,6 @@ modules:
         steer_enable_dev: Float
         headlights_dev: Float
         taillights_dev: Float
-
         jpeg_frames: Binary
       endpoints: 
         "/": 
@@ -50,7 +52,7 @@ modules:
             directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights ]
+            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera, mjpeg_quality ]
             outputs: [ accelerometer, magnetometer, gyroscope, temperature, pressure ]
         "/debug":
           WebSocket:
@@ -109,3 +111,5 @@ pipes:
   - { from: local_server.headlights, to: local_server.headlights_dev }
   - { from: local_server.taillights, to: local_server.taillights_dev }
   - { from: camera.mjpeg, to: local_server.jpeg_frames }
+  - { from: local_server.enable_camera, to: camera.enable }
+  - { from: local_server.mjpeg_quality, to: camera.quality }
