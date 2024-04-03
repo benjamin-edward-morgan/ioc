@@ -88,6 +88,7 @@ impl CameraState {
 struct CameraParams {
     enabled: bool,
     q: u8, //from 0 to 100 inclusive
+    framerate: u8, //from 1 to 60 inclusive
 }
 
 impl CameraParams {
@@ -100,7 +101,6 @@ impl CameraParams {
             "--width", "640",
             "--height", "480",
             "--codec", "mjpeg",
-            "--framerate", "10",
             "--tuning-file", "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
             "--mode", "3280:2464:10:U", //mode makes sure to use the whole sensor, not cropping middle
         ] {
@@ -109,6 +109,9 @@ impl CameraParams {
 
         params.push("-q".to_string());
         params.push(self.q.to_string());
+
+        params.push("--framerate".to_string());
+        params.push(self.framerate.to_string());
 
         for arg in [
                 "-t", "0", //no timeout - stream forever 
@@ -128,6 +131,7 @@ impl Default for CameraParams {
         CameraParams {
             enabled: false,
             q: 50,
+            framerate: 5,
         }
     }
 }
@@ -136,6 +140,7 @@ fn spawn_watch_camera_params(
     params: &CameraParams,
     mut enable: mpsc::Receiver<bool>,
     mut q: mpsc::Receiver<f64>,
+    mut framerate: mpsc::Receiver<f64>,
     params_tx: mpsc::Sender<CameraEvt>,
 ) -> JoinHandle<()> {
     let mut params = params.clone();
@@ -162,6 +167,16 @@ fn spawn_watch_camera_params(
                         break;
                     }
                 },
+                framerate_o = framerate.recv() => {
+                    if let Some(framerate_val) = framerate_o {
+                        params.framerate = framerate_val.max(1.0).min(60.0) as u8;
+                        if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                },
             }
         }
         debug!("camera params task shutting down!");
@@ -180,6 +195,7 @@ impl CameraManager {
     pub(super) fn spawn_camera_manager_task(
         enable: mpsc::Receiver<bool>,
         q: mpsc::Receiver<f64>,
+        framerate: mpsc::Receiver<f64>,
         frames: watch::Sender<Vec<u8>>,
         cancel_token: CancellationToken,
     ) -> JoinHandle<()> {
@@ -188,7 +204,7 @@ impl CameraManager {
             let (camevt_tx, mut camevt_rx) = mpsc::channel::<CameraEvt>(10);
 
             let mut params = CameraParams::default();
-            let params_task = spawn_watch_camera_params(&params, enable, q, camevt_tx.clone());
+            let params_task = spawn_watch_camera_params(&params, enable, q, framerate, camevt_tx.clone());
 
             let mut state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
 
