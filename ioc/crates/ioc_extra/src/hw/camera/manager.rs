@@ -91,6 +91,7 @@ struct CameraParams {
     framerate: u8, //from 1 to 60 inclusive
     w: usize, //resolution width 
     h: usize, //resolution height
+    tuning_file: Option<String>, //libcamera tuning file
 }
 
 impl CameraParams {
@@ -101,7 +102,6 @@ impl CameraParams {
         for arg in [
             "--rotation", "180",
             "--codec", "mjpeg",
-            "--tuning-file", "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json",
             "--mode", "3280:2464:10:U", //mode makes sure to use the whole sensor, not cropping middle
         ] {
             params.push(arg.to_string());
@@ -118,6 +118,11 @@ impl CameraParams {
 
         params.push("--height".to_string());
         params.push(self.h.to_string());
+
+        if let Some(tuning_file) = &self.tuning_file {
+            params.push("--tuning-file".to_string());
+            params.push(tuning_file.to_string());
+        }
 
         for arg in [
                 "-t", "0", //no timeout - stream forever 
@@ -140,6 +145,7 @@ impl Default for CameraParams {
             framerate: 5,
             w: 640,
             h: 480,
+            tuning_file: None,
         }
     }
 }
@@ -149,6 +155,7 @@ fn spawn_watch_camera_params(
     mut enable: mpsc::Receiver<bool>,
     mut q: mpsc::Receiver<f64>,
     mut framerate: mpsc::Receiver<f64>,
+    mut tuning_file: mpsc::Receiver<String>,
     mut resolution: mpsc::Receiver<String>,
     params_tx: mpsc::Sender<CameraEvt>,
 ) -> JoinHandle<()> {
@@ -206,6 +213,20 @@ fn spawn_watch_camera_params(
                         break;
                     }
                 }
+                tuning_file_o = tuning_file.recv() => {
+                    if let Some(tuning_file_val) = tuning_file_o {
+                        if tuning_file_val.is_empty() {
+                            params.tuning_file = None;
+                        } else {
+                            params.tuning_file = Some(tuning_file_val);
+                        }
+                        if let Err(_) = params_tx.send(CameraEvt::ParamsUpdated(params.clone())).await {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
             }
         }
         debug!("camera params task shutting down!");
@@ -226,6 +247,7 @@ impl CameraManager {
         q: mpsc::Receiver<f64>,
         framerate: mpsc::Receiver<f64>,
         resolution: mpsc::Receiver<String>,
+        tuning_file: mpsc::Receiver<String>,
         frames: watch::Sender<Vec<u8>>,
         cancel_token: CancellationToken,
     ) -> JoinHandle<()> {
@@ -234,7 +256,7 @@ impl CameraManager {
             let (camevt_tx, mut camevt_rx) = mpsc::channel::<CameraEvt>(10);
 
             let mut params = CameraParams::default();
-            let params_task = spawn_watch_camera_params(&params, enable, q, framerate, resolution, camevt_tx.clone());
+            let params_task = spawn_watch_camera_params(&params, enable, q, framerate, tuning_file, resolution, camevt_tx.clone());
 
             let mut state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
 
