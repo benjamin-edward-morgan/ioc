@@ -40,6 +40,15 @@ modules:
               "640x480": "640x480"
               "1280x720": "1280x720"
               "1920x1080": "1920x1080"
+        camera_tuning_file:
+          String:
+            start: ""
+            max_length: 1024
+            choices:
+              "none": ""
+              "RpiCameraV2": "/usr/share/libcamera/ipa/rpi/vc4/imx219.json"
+              "RpiCameraV2 - NoIR": "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"
+              "Uncalibrated": "/usr/share/libcamera/ipa/rpi/vc4/uncalibrated.json"
       outputs:
         gyroscope: Array
         magnetometer: Array
@@ -63,12 +72,25 @@ modules:
             directory: "assets"
         "/ws":
           WebSocket: 
-            inputs: [ pan, tilt, pan_trim, tilt_trim, drive, steer, headlights, taillights, enable_camera, mjpeg_quality, camera_framerate, camera_resolution ]
-            outputs: [ accelerometer, magnetometer, gyroscope, temperature, pressure ]
+            inputs: [ 
+              pan, tilt, pan_trim, tilt_trim, 
+              drive, steer, 
+              headlights, taillights, 
+              enable_camera, mjpeg_quality, camera_framerate, camera_resolution, camera_tuning_file
+            ]
+            outputs: [ 
+              gyroscope, magnetometer, accelerometer, 
+              temperature, pressure, heading 
+            ]
         "/debug":
           WebSocket:
             inputs: [ ]
-            outputs: [ pan_dev, tilt_dev, drive_fwd_dev, drive_rev_dev, drive_enable_dev, steer_left_def, steer_right_def, steer_enable_dev, headlights_dev, taillights_dev ]
+            outputs: [ 
+              pan_dev, tilt_dev, 
+              drive_fwd_dev, drive_rev_dev, drive_enable_dev, 
+              steer_left_dev, steer_right_dev, steer_enable_dev, 
+              headlights_dev, taillights_dev 
+            ]
         "/stream":
           Mjpeg:
             output: jpeg_frames
@@ -113,16 +135,20 @@ transformers:
 pipes:
   - { from: pan_servo.value, to: local_server.pan_dev }
   - { from: tilt_servo.value, to: local_server.tilt_dev }
+
   - { from: drive_hbridge.forward, to: local_server.drive_fwd_dev }
   - { from: drive_hbridge.reverse, to: local_server.drive_rev_dev }
   - { from: drive_hbridge.enable, to: local_server.drive_enable_dev }
   - { from: steer_hbridge.forward, to: local_server.steer_left_dev }
   - { from: steer_hbridge.reverse, to: local_server.steer_right_dev }
   - { from: steer_hbridge.enable, to: local_server.steer_enable_dev }
+
   - { from: local_server.headlights, to: local_server.headlights_dev }
   - { from: local_server.taillights, to: local_server.taillights_dev }
+
   - { from: camera.mjpeg, to: local_server.jpeg_frames }
   - { from: local_server.enable_camera, to: camera.enable }
   - { from: local_server.mjpeg_quality, to: camera.quality }
   - { from: local_server.camera_framerate, to: camera.framerate }
   - { from: local_server.camera_resolution, to: camera.resolution }
+  - { from: local_server.camera_tuning_file, to: camera.tuning_file }

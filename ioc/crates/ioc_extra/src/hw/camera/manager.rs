@@ -39,7 +39,6 @@ impl CameraMjpegStream {
     }
 
     async fn transition(&mut self, _params: &CameraParams) {
-        debug!("camera mjpeg stream transition");
         self.cancel_token.cancel();
     }
 }
@@ -57,8 +56,7 @@ impl CameraDisabled {
         Self{ frames: Some(frames), camevt_tx }
     }
 
-    async fn transition(&mut self, params: &CameraParams) {
-        debug!("camera disabled transition {:?} has frames: {}", params, self.frames.is_some());
+    async fn transition(&mut self, _params: &CameraParams) {
         match self.frames.take() {
             Some(frames) => {
                 self.camevt_tx.send(CameraEvt::StreamFinished(frames)).await.unwrap();
@@ -229,7 +227,7 @@ fn spawn_watch_camera_params(
                 }
             }
         }
-        debug!("camera params task shutting down!");
+        debug!("camera param watch task shutting down!");
     })
 }
 
@@ -268,17 +266,13 @@ impl CameraManager {
                     cam_evt = camevt_rx.recv() => {
                         match cam_evt {
                             Some(CameraEvt::ParamsUpdated(new_params)) => {
-                                debug!("new params! {:?}", new_params);
                                 params = new_params.clone();
                                 state.transition(&new_params).await;
                             },
                             Some(CameraEvt::StreamFinished(frames)) => {
-                                debug!("stream finished!");
                                 if !params.enabled {
-                                    debug!("making stream disabled state");
                                     state = CameraState::Disabled(CameraDisabled::new(frames, camevt_tx.clone(), params.clone()));
                                 } else {
-                                    debug!("making stream mjpeg state");
                                     state = CameraState::MjpegStream(CameraMjpegStream::new(frames, camevt_tx.clone(), params.clone()));
                                 }
                             },
