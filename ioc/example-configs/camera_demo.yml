@@ -24,12 +24,21 @@ modules:
               "640x480": "640x480"
               "1280x720": "1280x720"
               "1920x1080": "1920x1080"
+        camera_tuning_file:
+          String:
+            start: ""
+            max_length: 1024
+            choices:
+              "none": ""
+              "RpiCameraV2": "/usr/share/libcamera/ipa/rpi/vc4/imx219.json"
+              "RpiCameraV2 - NoIR": "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"
+              "Uncalibrated": "/usr/share/libcamera/ipa/rpi/vc4/uncalibrated.json"
       outputs:
         jpeg_frames: Binary
       endpoints: 
         "/ws":
           WebSocket: 
-            inputs: [ enable_camera, mjpeg_quality, camera_framerate, camera_resolution ]
+            inputs: [ enable_camera, mjpeg_quality, camera_framerate, camera_resolution, camera_tuning_file ]
             outputs: [ ]
         "/stream":
           Mjpeg:
@@ -47,3 +56,4 @@ pipes:
   - { from: local_server.mjpeg_quality, to: camera.quality }
   - { from: local_server.camera_framerate, to: camera.framerate }
   - { from: local_server.camera_resolution, to: camera.resolution }
+  - { from: local_server.camera_tuning_file, to: camera.tuning_file }
