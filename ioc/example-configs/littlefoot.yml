@@ -17,11 +17,11 @@ modules:
         pan: 
           Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
         pan_trim: 
-          Float: { start: 0.0556640625, min: -1, max: 1, step: 0.0009765625 }
+          Float: { start: 0.0, min: -1, max: 1, step: 0.0009765625 }
         tilt: 
           Float: { start: 0, min: -1, max: 1, step: 0.0009765625 }
         tilt_trim: 
-          Float: { start: 0.67578125, min: -1, max: 1, step: 0.0009765625 }
+          Float: { start: 0.5, min: -1, max: 1, step: 0.0009765625 }
         headlights:
           Float: { start: 0.5, min: 0, max: 1, step: 0.1 }
         taillights:
@@ -29,12 +29,12 @@ modules:
         enable_camera:
           Bool: { start: true }
         mjpeg_quality:
-          Float: { start: 50, min: 0, max: 100, step: 1 }
+          Float: { start: 35, min: 0, max: 100, step: 1 }
         camera_framerate:
-          Float: { start: 5, min: 1, max: 60, step: 1 }
+          Float: { start: 10, min: 1, max: 60, step: 1 }
         camera_resolution:
           String: 
-            start: "640x480"
+            start: "320x240"
             max_length: 12
             choices: 
               "320x240": "320x240"
@@ -43,7 +43,7 @@ modules:
               "1920x1080": "1920x1080"
         camera_tuning_file:
           String:
-            start: ""
+            start: "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"
             max_length: 1024
             choices:
               "none": ""
