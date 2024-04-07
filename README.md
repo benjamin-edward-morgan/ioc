@@ -1,6 +1,8 @@
 # ioc
 input. output. control. This is a simple framework for building robots and remotely operated devices. Inputs could be sensors or directly supplied from a user interface. Outputs could be actuators or status indicators. Transformers consume inputs and create new inputs. A configuration file describes a graph that dictates how these elements are connected together in a running system. 
 
+** SEE ALSO: [littlefoot](https://github.com/benjamin-edward-morgan/littlefoot) **: An archive of an RC car powered by IOC build and the web UI for the RC car. 
+
 #### Status
 This project is a work-in-progress and under active development. Please get in touch if you are interested in contributing! I will also probably rename this at some point, since IOC as already taken on crates.io
 
